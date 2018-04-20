@@ -11,29 +11,12 @@ using namespace std;
 
 const int ECHOPORT = 5599;
 const int BUFFSIZE = 1000;
+const int SERVER_KEY = 54621;
+const int CLIENT_KEY = 45328;
 
 
-void thrdFunc(int c_sockfd)
-{
-    int mlen;
-    char buf[BUFFSIZE];
 
-    while (1) {
-        if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-            perror("read error");
-            break;
-        }
-        printf("Client #%d: %s\n", c_sockfd, buf);
-
-        if (send(c_sockfd, buf, mlen, 0) == -1) {
-            perror("write error");
-            break;
-        }
-
-        printf("sending %i bytes back to the client\n", mlen);
-    }
-}
-
+void thrdFunc(int c_sockfd);
 
 
 int main()
@@ -84,4 +67,25 @@ int main()
     close(c_sockfd);
 
     return 0;
+}
+
+void thrdFunc(int c_sockfd)
+{
+    int mlen;
+    char buf[BUFFSIZE];
+
+    while (1) {
+        if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
+            perror("read error");
+            break;
+        }
+        printf("Client #%d: %s\n", c_sockfd, buf);
+
+        if (send(c_sockfd, buf, mlen, 0) == -1) {
+            perror("write error");
+            break;
+        }
+
+        printf("sending %i bytes back to the client\n", mlen);
+    }
 }
