@@ -11,19 +11,112 @@ using namespace std;
 
 const int ECHOPORT = 5599;
 const int BUFFSIZE = 1000;
-const int SERVER_KEY = 54621;
-const int CLIENT_KEY = 45328;
 
 
+
+
+class CAuthentication
+{
+public:
+    CAuthentication(int c_sockfd)
+            :m_serverHash(0), m_clientHash(0), m_client(c_sockfd)
+    {}
+
+    bool auth()
+    {
+        int messLen;
+        char buf[BUFFSIZE];
+
+        //getting username
+        if ((messLen = read(m_client, buf, BUFFSIZE)) == -1) {
+            perror("read error");
+            return false;
+        }
+
+        unsigned short int hash = makeHash(buf, messLen);
+        unsigned short int confirmationCode = (hash + SERVER_KEY) % 65536;
+
+
+        putCodeIntoBuffer(buf, confirmationCode);
+
+//            printf("Client #%d: %s\n", c_sockfd, buf);
+
+        //sending code to the client
+        if (write(m_client, buf, 5) == -1) {
+            perror("write error");
+            return false;
+        }
+
+        //getting client's response
+        if ((messLen = read(m_client, buf, BUFFSIZE)) == -1) {
+            perror("read error");
+            return false;
+        }
+
+        char response[5];
+        response[0] = buf[0];
+        response[1] = buf[1];
+        response[2] = buf[2];
+        response[3] = buf[3];
+        response[4] = buf[4];
+
+        unsigned short int clientConfirmationCode = (unsigned short)atoi(response);
+        unsigned short int expected = (hash + CLIENT_KEY) % 65536;
+
+        return expected == clientConfirmationCode;
+
+        printf("sending %i bytes back to the client\n", messLen);
+    }
+
+private:
+    const unsigned short int CLIENT_KEY = 45328;
+    const unsigned short int SERVER_KEY = 54621;
+    unsigned short int m_serverHash;
+    unsigned short int m_clientHash;
+    int m_client;
+    char m_outgoing[5];
+
+    void putCodeIntoBuffer(char * buf, unsigned short int hash)
+    {
+        buf[0] = (char)(hash / 4);
+        buf[1] = (char)((hash / 3) % 10);
+        buf[2] = (char)((hash / 2) % 10);
+        buf[3] = (char)((hash / 1) % 10);
+        buf[4] = (char)(hash % 10);
+    }
+
+    unsigned short int makeHash(const char* buf, int messLen)
+    {
+        int usernameLen = messLen - 4;
+        unsigned short int hash = 0;
+        for(int i = 0; i < usernameLen; i++) {
+            hash += buf[i];
+        }
+        hash = (hash * 1000) % 65536;
+        return hash;
+    }
+};
 
 void thrdFunc(int c_sockfd);
-
 
 int main()
 {
 
     // int x = 935398;
-    // cout << x / 100000;
+//     cout << (40784 + 54621) % 65536;
+
+    cout << SERVER_MOVE;
+
+//    int har = 65536;
+//    char a[4];
+//    a[0] = har & 0xff;
+//    a[1] = (har>>8)  & 0xff;
+//    a[2] = (har>>16) & 0xff;
+//    a[3] = (har>>24) & 0xff;
+//
+//    for (int i = 0; i < 4; ++i) {
+//        cout << (int)a[i] << ' ';
+//    }
 
     int my_sockfd;
     sockaddr_in my_addr;
@@ -74,6 +167,13 @@ void thrdFunc(int c_sockfd)
     int mlen;
     char buf[BUFFSIZE];
 
+    CAuthentication auth(c_sockfd);
+
+    if(auth.auth()) {
+        close(c_sockfd);
+        return;
+    }
+
     while (1) {
         if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
             perror("read error");
@@ -85,7 +185,7 @@ void thrdFunc(int c_sockfd)
 
         printf("Client #%d: %s\n", c_sockfd, buf);
 
-        if (write(c_sockfd, buf, mlen) == -1) {
+        if (write(c_sockfd, SERVER_MOVE, mlen) == -1) {
             perror("write error");
             break;
         }
