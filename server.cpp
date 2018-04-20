@@ -64,7 +64,7 @@ int main()
         cout << "accepted new client\n";
     }
 
-    close(c_sockfd);
+    close(my_sockfd);
 
     return 0;
 }
@@ -79,13 +79,18 @@ void thrdFunc(int c_sockfd)
             perror("read error");
             break;
         }
+
+        if(mlen == 0)
+            break;
+
         printf("Client #%d: %s\n", c_sockfd, buf);
 
-        if (send(c_sockfd, buf, mlen, 0) == -1) {
+        if (write(c_sockfd, buf, mlen) == -1) {
             perror("write error");
             break;
         }
 
         printf("sending %i bytes back to the client\n", mlen);
     }
+    close(c_sockfd);
 }
