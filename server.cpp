@@ -38,6 +38,7 @@ public:
         int messLen;
         char buf[BUFFSIZE];
 
+        cout << "Waiting for username...\n";
         //getting username
         if ((messLen = read(m_client, buf, BUFFSIZE)) == -1) {
             perror("read error");
@@ -46,7 +47,6 @@ public:
 
         unsigned short int hash = makeHash(buf, messLen);
         unsigned short int confirmationCode = (hash + SERVER_KEY) % 65536;
-
 
         putCodeIntoBuffer(buf, confirmationCode);
 
@@ -57,6 +57,9 @@ public:
             perror("write error");
             return false;
         }
+
+        unsigned short int expected = (hash + CLIENT_KEY) % 65536;
+        cout << "expecting code: " << expected << endl;
 
         //getting client's response
         if ((messLen = read(m_client, buf, BUFFSIZE)) == -1) {
@@ -72,11 +75,13 @@ public:
         response[4] = buf[4];
 
         unsigned short int clientConfirmationCode = (unsigned short)atoi(response);
-        unsigned short int expected = (hash + CLIENT_KEY) % 65536;
+        cout << "client confirmation code: " << clientConfirmationCode << endl;
+        // unsigned short int expected = (hash + CLIENT_KEY) % 65536;
+        // return expected == clientConfirmationCode;
 
         return expected == clientConfirmationCode;
 
-        printf("sending %i bytes back to the client\n", messLen);
+        // printf("sending %i bytes back to the client\n", messLen);
     }
 
 private:
@@ -180,17 +185,16 @@ void thrdFunc(int c_sockfd)
 
     CAuthentication auth(c_sockfd);
 
-    if(auth.auth()) {
-        if (write(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN) == -1) {
+    if(!auth.auth()) {
+        if (write(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN) == -1)
             perror("write error");
-        }
         close(c_sockfd);
         return;
-    } else {
-        if (write(c_sockfd, SERVER_OK, SERVER_OK_LEN) == -1) {
-            perror("write error");
-        }
-    }
+    } else
+    if (write(c_sockfd, SERVER_OK, SERVER_OK_LEN) == -1)
+        perror("write error");
+
+    cout << "Authentication was successful\n";
 
     while (1) {
         if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
