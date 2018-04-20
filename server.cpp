@@ -22,6 +22,9 @@ const int BUFFSIZE = 1000;
 #define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\\a\\b"
 #define SERVER_LOGIC_ERROR "302 LOGIC ERROR\\a\\b"
 
+#define SERVER_LOGIN_FAILED_LEN 22
+#define SERVER_OK_LEN 12
+
 
 class CAuthentication
 {
@@ -113,7 +116,7 @@ int main()
     // int x = 935398;
 //     cout << (40784 + 54621) % 65536;
 
-    cout << SERVER_MOVE;
+//    cout << SERVER_MOVE;
 
 //    int har = 65536;
 //    char a[4];
@@ -178,8 +181,15 @@ void thrdFunc(int c_sockfd)
     CAuthentication auth(c_sockfd);
 
     if(auth.auth()) {
+        if (write(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN) == -1) {
+            perror("write error");
+        }
         close(c_sockfd);
         return;
+    } else {
+        if (write(c_sockfd, SERVER_OK, SERVER_OK_LEN) == -1) {
+            perror("write error");
+        }
     }
 
     while (1) {
