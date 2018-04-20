@@ -57,41 +57,67 @@ include CMakeFiles/TCP_server.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/TCP_server.dir/flags.make
 
-CMakeFiles/TCP_server.dir/main.cpp.o: CMakeFiles/TCP_server.dir/flags.make
-CMakeFiles/TCP_server.dir/main.cpp.o: ../main.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/victor/githubRepos/TCP_server/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/TCP_server.dir/main.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/TCP_server.dir/main.cpp.o -c /home/victor/githubRepos/TCP_server/main.cpp
+CMakeFiles/TCP_server.dir/server.cpp.o: CMakeFiles/TCP_server.dir/flags.make
+CMakeFiles/TCP_server.dir/server.cpp.o: ../server.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/victor/githubRepos/TCP_server/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/TCP_server.dir/server.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/TCP_server.dir/server.cpp.o -c /home/victor/githubRepos/TCP_server/server.cpp
 
-CMakeFiles/TCP_server.dir/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/TCP_server.dir/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/victor/githubRepos/TCP_server/main.cpp > CMakeFiles/TCP_server.dir/main.cpp.i
+CMakeFiles/TCP_server.dir/server.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/TCP_server.dir/server.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/victor/githubRepos/TCP_server/server.cpp > CMakeFiles/TCP_server.dir/server.cpp.i
 
-CMakeFiles/TCP_server.dir/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/TCP_server.dir/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/victor/githubRepos/TCP_server/main.cpp -o CMakeFiles/TCP_server.dir/main.cpp.s
+CMakeFiles/TCP_server.dir/server.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/TCP_server.dir/server.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/victor/githubRepos/TCP_server/server.cpp -o CMakeFiles/TCP_server.dir/server.cpp.s
 
-CMakeFiles/TCP_server.dir/main.cpp.o.requires:
+CMakeFiles/TCP_server.dir/server.cpp.o.requires:
 
-.PHONY : CMakeFiles/TCP_server.dir/main.cpp.o.requires
+.PHONY : CMakeFiles/TCP_server.dir/server.cpp.o.requires
 
-CMakeFiles/TCP_server.dir/main.cpp.o.provides: CMakeFiles/TCP_server.dir/main.cpp.o.requires
-	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/main.cpp.o.provides.build
-.PHONY : CMakeFiles/TCP_server.dir/main.cpp.o.provides
+CMakeFiles/TCP_server.dir/server.cpp.o.provides: CMakeFiles/TCP_server.dir/server.cpp.o.requires
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/server.cpp.o.provides.build
+.PHONY : CMakeFiles/TCP_server.dir/server.cpp.o.provides
 
-CMakeFiles/TCP_server.dir/main.cpp.o.provides.build: CMakeFiles/TCP_server.dir/main.cpp.o
+CMakeFiles/TCP_server.dir/server.cpp.o.provides.build: CMakeFiles/TCP_server.dir/server.cpp.o
+
+
+CMakeFiles/TCP_server.dir/client.cpp.o: CMakeFiles/TCP_server.dir/flags.make
+CMakeFiles/TCP_server.dir/client.cpp.o: ../client.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/victor/githubRepos/TCP_server/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/TCP_server.dir/client.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/TCP_server.dir/client.cpp.o -c /home/victor/githubRepos/TCP_server/client.cpp
+
+CMakeFiles/TCP_server.dir/client.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/TCP_server.dir/client.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/victor/githubRepos/TCP_server/client.cpp > CMakeFiles/TCP_server.dir/client.cpp.i
+
+CMakeFiles/TCP_server.dir/client.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/TCP_server.dir/client.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/victor/githubRepos/TCP_server/client.cpp -o CMakeFiles/TCP_server.dir/client.cpp.s
+
+CMakeFiles/TCP_server.dir/client.cpp.o.requires:
+
+.PHONY : CMakeFiles/TCP_server.dir/client.cpp.o.requires
+
+CMakeFiles/TCP_server.dir/client.cpp.o.provides: CMakeFiles/TCP_server.dir/client.cpp.o.requires
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/client.cpp.o.provides.build
+.PHONY : CMakeFiles/TCP_server.dir/client.cpp.o.provides
+
+CMakeFiles/TCP_server.dir/client.cpp.o.provides.build: CMakeFiles/TCP_server.dir/client.cpp.o
 
 
 # Object files for target TCP_server
 TCP_server_OBJECTS = \
-"CMakeFiles/TCP_server.dir/main.cpp.o"
+"CMakeFiles/TCP_server.dir/server.cpp.o" \
+"CMakeFiles/TCP_server.dir/client.cpp.o"
 
 # External object files for target TCP_server
 TCP_server_EXTERNAL_OBJECTS =
 
-TCP_server: CMakeFiles/TCP_server.dir/main.cpp.o
+TCP_server: CMakeFiles/TCP_server.dir/server.cpp.o
+TCP_server: CMakeFiles/TCP_server.dir/client.cpp.o
 TCP_server: CMakeFiles/TCP_server.dir/build.make
 TCP_server: CMakeFiles/TCP_server.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/victor/githubRepos/TCP_server/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable TCP_server"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/victor/githubRepos/TCP_server/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable TCP_server"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/TCP_server.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -99,7 +125,8 @@ CMakeFiles/TCP_server.dir/build: TCP_server
 
 .PHONY : CMakeFiles/TCP_server.dir/build
 
-CMakeFiles/TCP_server.dir/requires: CMakeFiles/TCP_server.dir/main.cpp.o.requires
+CMakeFiles/TCP_server.dir/requires: CMakeFiles/TCP_server.dir/server.cpp.o.requires
+CMakeFiles/TCP_server.dir/requires: CMakeFiles/TCP_server.dir/client.cpp.o.requires
 
 .PHONY : CMakeFiles/TCP_server.dir/requires
 

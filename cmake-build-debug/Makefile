@@ -123,32 +123,59 @@ TCP_server/fast:
 	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/build
 .PHONY : TCP_server/fast
 
-main.o: main.cpp.o
+client.o: client.cpp.o
 
-.PHONY : main.o
+.PHONY : client.o
 
 # target to build an object file
-main.cpp.o:
-	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/main.cpp.o
-.PHONY : main.cpp.o
+client.cpp.o:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/client.cpp.o
+.PHONY : client.cpp.o
 
-main.i: main.cpp.i
+client.i: client.cpp.i
 
-.PHONY : main.i
+.PHONY : client.i
 
 # target to preprocess a source file
-main.cpp.i:
-	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/main.cpp.i
-.PHONY : main.cpp.i
+client.cpp.i:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/client.cpp.i
+.PHONY : client.cpp.i
 
-main.s: main.cpp.s
+client.s: client.cpp.s
 
-.PHONY : main.s
+.PHONY : client.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/main.cpp.s
-.PHONY : main.cpp.s
+client.cpp.s:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/client.cpp.s
+.PHONY : client.cpp.s
+
+server.o: server.cpp.o
+
+.PHONY : server.o
+
+# target to build an object file
+server.cpp.o:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/server.cpp.o
+.PHONY : server.cpp.o
+
+server.i: server.cpp.i
+
+.PHONY : server.i
+
+# target to preprocess a source file
+server.cpp.i:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/server.cpp.i
+.PHONY : server.cpp.i
+
+server.s: server.cpp.s
+
+.PHONY : server.s
+
+# target to generate assembly for a file
+server.cpp.s:
+	$(MAKE) -f CMakeFiles/TCP_server.dir/build.make CMakeFiles/TCP_server.dir/server.cpp.s
+.PHONY : server.cpp.s
 
 # Help Target
 help:
@@ -159,9 +186,12 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... TCP_server"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
+	@echo "... client.o"
+	@echo "... client.i"
+	@echo "... client.s"
+	@echo "... server.o"
+	@echo "... server.i"
+	@echo "... server.s"
 .PHONY : help
 
 
