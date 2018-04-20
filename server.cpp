@@ -12,7 +12,15 @@ using namespace std;
 const int ECHOPORT = 5599;
 const int BUFFSIZE = 1000;
 
-
+#define SERVER_MOVE "102 MOVE\\a\\b"
+#define SERVER_TURN_LEFT "103 TURN LEFT\\a\\b"
+#define SERVER_TURN_RIGHT "104 TURN RIGHT\\a\\b"
+#define SERVER_PICK_UP "105 GET MESSAGE\\a\\b"
+#define SERVER_LOGOUT "106 LOGOUT\\a\\b"
+#define SERVER_OK "200 OK\\a\\b"
+#define SERVER_LOGIN_FAILED "300 LOGIN FAILED\\a\\b"
+#define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\\a\\b"
+#define SERVER_LOGIC_ERROR "302 LOGIC ERROR\\a\\b"
 
 
 class CAuthentication
