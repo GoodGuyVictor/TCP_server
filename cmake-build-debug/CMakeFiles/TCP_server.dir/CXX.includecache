@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/victor/githubRepos/TCP_server/server.cpp
+iostream
+-
+sys/socket.h
+-
+sys/types.h
+-
+netinet/in.h
+-
+memory.h
+-
+unistd.h
+-
+thread
+-
+vector
+-
+

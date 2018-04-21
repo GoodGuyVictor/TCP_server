@@ -84,9 +84,6 @@
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="/home/victor/githubRepos/TCP_server/client.cpp">
-			<Option target="TCP_server"/>
-		</Unit>
 		<Unit filename="/home/victor/githubRepos/TCP_server/server.cpp">
 			<Option target="TCP_server"/>
 		</Unit>

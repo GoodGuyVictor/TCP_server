@@ -3,4 +3,4 @@ project(TCP_server)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(TCP_server server.cpp client.cpp)
+add_executable(TCP_server server.cpp)

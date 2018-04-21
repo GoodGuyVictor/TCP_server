@@ -1,6 +1,5 @@
 file(REMOVE_RECURSE
   "CMakeFiles/TCP_server.dir/server.cpp.o"
-  "CMakeFiles/TCP_server.dir/client.cpp.o"
   "TCP_server.pdb"
   "TCP_server"
 )
