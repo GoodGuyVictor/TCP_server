@@ -30,6 +30,7 @@ public:
     CServer()
     {
         setUpSocket();
+        run();
     }
 
 private:
@@ -85,7 +86,7 @@ void CServer::run()
     while(1) {
         rem_addr_len = sizeof(m_rem_addr);
         c_sockfd = accept(m_my_sockfd, (struct sockaddr *)&m_rem_addr, &rem_addr_len);
-        threads.emplace_back( thread(clientRoutine, c_sockfd) );
+        threads.emplace_back( thread(&CServer::clientRoutine, this, c_sockfd) );
         cout << "accepted new client\n";
     }
 
@@ -206,5 +207,3 @@ int main()
 
     return 0;
 }
-
-
