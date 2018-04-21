@@ -42,6 +42,7 @@ private:
     int m_my_sockfd;
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
+    char m_buffer[1000];
 
 
     void setUpSocket();
@@ -50,7 +51,8 @@ private:
     bool authenticate(int c_sockfd);
     unsigned short makeHash(const char * buff, int mLen);
     void putCodeIntoBuffer(char * buff, unsigned short code);
-    void send(int c_sockfd, const char * message, size_t mlen) const;
+    void sendMessage(int c_sockfd, const char *message, int mlen) const;
+    int receiveMessage(int c_sockfd);
 };
 
 void CServer::setUpSocket()
@@ -102,27 +104,35 @@ void CServer::clientRoutine(int c_sockfd)
     char buf[BUFFSIZE];
 
     if(!authenticate(c_sockfd)) {
-        send(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+        sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
     } else
-        send(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+        sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+
+    //robot creation here
 
     cout << "Authentication was successful\n";
 
     while (1) {
-        if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-            perror("read error");
+
+        try {
+            mlen = receiveMessage(c_sockfd);
+        }
+        catch (ComunicationException e) {
             break;
         }
+
 
         if(mlen == 0)
             break;
 
-        printf("Client #%d: %s\n", c_sockfd, buf);
+        printf("Client #%d: %s\n", c_sockfd, m_buffer);
 
-        if (write(c_sockfd, SERVER_MOVE, mlen) == -1) {
-            perror("write error");
+        try {
+            sendMessage(c_sockfd, m_buffer, mlen);
+        }
+        catch (ComunicationException e) {
             break;
         }
 
@@ -199,13 +209,22 @@ void CServer::putCodeIntoBuffer(char *buff, unsigned short code)
     buff[4] = (char)(code % 10);
 }
 
-void CServer::send(int c_sockfd, const char * message, size_t mlen) const
+void CServer::sendMessage(int c_sockfd, const char *message, int mlen) const
 {
-    if (write(c_sockfd, message, mlen) == -1) {
+    if (send(c_sockfd, message, mlen, 0) == -1) {
         perror("write error");
         throw ComunicationException();
     }
+}
 
+int CServer::receiveMessage(int c_sockfd)
+{
+    int mlen = 0;
+    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
+        perror("read error");
+        throw ComunicationException();
+    }
+    return mlen;
 }
 
 int main()
