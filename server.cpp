@@ -144,25 +144,28 @@ void CServer::clientRoutine(int c_sockfd)
 bool CServer::authenticate(int c_sockfd)
 {
     int messLen;
-    char buf[BUFFSIZE];
 
     cout << "Waiting for username...\n";
     //getting username
-    if ((messLen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-        perror("read error");
+    try {
+        messLen = receiveMessage(c_sockfd);
+    }
+    catch (ComunicationException e) {
         return false;
     }
 
-    unsigned short hash = makeHash(buf, messLen);
+    unsigned short hash = makeHash(m_buffer, messLen);
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
 
-    putCodeIntoBuffer(buf, confirmationCode);
+    putCodeIntoBuffer(m_buffer, confirmationCode);
 
 //            printf("Client #%d: %s\n", c_sockfd, buf);
 
     //sending code to the client
-    if (write(c_sockfd, buf, 5) == -1) {
-        perror("write error");
+    try {
+        sendMessage(c_sockfd, m_buffer, 5);
+    }
+    catch (ComunicationException e) {
         return false;
     }
 
@@ -170,17 +173,19 @@ bool CServer::authenticate(int c_sockfd)
     cout << "expecting code: " << expected << endl;
 
     //getting client's response
-    if ((messLen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-        perror("read error");
+    try {
+        messLen = receiveMessage(c_sockfd);
+    }
+    catch (ComunicationException e) {
         return false;
     }
 
     char response[5];
-    response[0] = buf[0];
-    response[1] = buf[1];
-    response[2] = buf[2];
-    response[3] = buf[3];
-    response[4] = buf[4];
+    response[0] = m_buffer[0];
+    response[1] = m_buffer[1];
+    response[2] = m_buffer[2];
+    response[3] = m_buffer[3];
+    response[4] = m_buffer[4];
 
     unsigned short clientConfirmationCode = (unsigned short)atoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
