@@ -9,7 +9,6 @@
 
 using namespace std;
 
-const int BUFFSIZE = 1000;
 
 #define SERVER_MOVE "102 MOVE\\a\\b"
 #define SERVER_TURN_LEFT "103 TURN LEFT\\a\\b"
@@ -24,6 +23,8 @@ const int BUFFSIZE = 1000;
 #define SERVER_LOGIN_FAILED_LEN 22
 #define SERVER_OK_LEN 12
 
+class ComunicationException{};
+
 class CServer
 {
 public:
@@ -35,8 +36,9 @@ public:
 
 private:
     const int ECHOPORT = 5599;
-    const unsigned short int CLIENT_KEY = 45328;
-    const unsigned short int SERVER_KEY = 54621;
+    const int BUFFSIZE = 1000;
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
     int m_my_sockfd;
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
@@ -48,6 +50,7 @@ private:
     bool authenticate(int c_sockfd);
     unsigned short makeHash(const char * buff, int mLen);
     void putCodeIntoBuffer(char * buff, unsigned short code);
+    void send(int c_sockfd, const char * message, size_t mlen) const;
 };
 
 void CServer::setUpSocket()
@@ -98,16 +101,12 @@ void CServer::clientRoutine(int c_sockfd)
     int mlen;
     char buf[BUFFSIZE];
 
-//        CAuthentication auth(c_sockfd);
-
     if(!authenticate(c_sockfd)) {
-        if (write(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN) == -1)
-            perror("write error");
+        send(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
     } else
-    if (write(c_sockfd, SERVER_OK, SERVER_OK_LEN) == -1)
-        perror("write error");
+        send(c_sockfd, SERVER_OK, SERVER_OK_LEN);
 
     cout << "Authentication was successful\n";
 
@@ -198,6 +197,15 @@ void CServer::putCodeIntoBuffer(char *buff, unsigned short code)
     buff[2] = (char)((code / 2) % 10);
     buff[3] = (char)((code / 1) % 10);
     buff[4] = (char)(code % 10);
+}
+
+void CServer::send(int c_sockfd, const char * message, size_t mlen) const
+{
+    if (write(c_sockfd, message, mlen) == -1) {
+        perror("write error");
+        throw ComunicationException();
+    }
+
 }
 
 int main()
