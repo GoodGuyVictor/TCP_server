@@ -9,7 +9,6 @@
 
 using namespace std;
 
-const int ECHOPORT = 5599;
 const int BUFFSIZE = 1000;
 
 #define SERVER_MOVE "102 MOVE\\a\\b"
@@ -24,6 +23,38 @@ const int BUFFSIZE = 1000;
 
 #define SERVER_LOGIN_FAILED_LEN 22
 #define SERVER_OK_LEN 12
+
+class CServer
+{
+public:
+    CServer() { setUpSocket(); }
+
+private:
+    const int ECHOPORT = 5599;
+    int m_my_sockfd;
+    sockaddr_in m_my_addr;
+    sockaddr_in m_rem_addr;
+
+
+    void setUpSocket()
+    {
+        m_my_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if(m_my_sockfd == -1) {
+            cout << "Could not created socket\n";
+            exit(1);
+        }
+
+        bzero(&m_my_addr, sizeof(m_my_addr));
+        m_my_addr.sin_family = AF_INET;
+        m_my_addr.sin_port = htons(ECHOPORT);
+
+        if(bind(m_my_sockfd, (struct sockaddr *)&m_my_addr, sizeof(m_my_addr)) == -1) {
+            cout << "Bind error\n";
+            close(m_my_sockfd);
+            exit(1);
+        }
+    }
+};
 
 
 class CAuthentication
@@ -117,42 +148,6 @@ void thrdFunc(int c_sockfd);
 
 int main()
 {
-
-    // int x = 935398;
-//     cout << (40784 + 54621) % 65536;
-
-//    cout << SERVER_MOVE;
-
-//    int har = 65536;
-//    char a[4];
-//    a[0] = har & 0xff;
-//    a[1] = (har>>8)  & 0xff;
-//    a[2] = (har>>16) & 0xff;
-//    a[3] = (har>>24) & 0xff;
-//
-//    for (int i = 0; i < 4; ++i) {
-//        cout << (int)a[i] << ' ';
-//    }
-
-    int my_sockfd;
-    sockaddr_in my_addr;
-    sockaddr_in rem_addr;
-
-    my_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(my_sockfd == -1) {
-        cout << "Could not created socket\n";
-        exit(1);
-    }
-
-    bzero(&my_addr, sizeof(my_addr));
-    my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(ECHOPORT);
-
-    if(bind(my_sockfd, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
-        cout << "Bind error\n";
-        close(my_sockfd);
-        exit(1);
-    }
 
     if(listen(my_sockfd, 10) == -1) {
         cout << "Listen error\n";
