@@ -62,7 +62,7 @@ private:
     void clientRoutine(int c_sockfd);
     bool authenticate(int c_sockfd);
     unsigned short makeHash();
-    void putCodeIntoBuffer(unsigned short code);
+    int putCodeIntoBuffer(unsigned short code);
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
 };
@@ -183,11 +183,11 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short hash = makeHash();
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
 
-    putCodeIntoBuffer(confirmationCode);
+    int codeLen = putCodeIntoBuffer(confirmationCode);
 
     //sending code to the client
     try {
-        sendMessage(c_sockfd, m_buffer, 5);
+        sendMessage(c_sockfd, m_buffer, codeLen);
     }
     catch (ComunicationException e) {
         return false;
@@ -228,13 +228,15 @@ unsigned short CServer::makeHash()
     return hash;
 }
 
-void CServer::putCodeIntoBuffer(unsigned short code)
+int CServer::putCodeIntoBuffer(unsigned short code)
 {
-    m_buffer[0] = (char)(code / 4);
-    m_buffer[1] = (char)((code / 3) % 10);
-    m_buffer[2] = (char)((code / 2) % 10);
-    m_buffer[3] = (char)((code / 1) % 10);
-    m_buffer[4] = (char)(code % 10);
+
+    string tmpStr = to_string(code);
+    for (int i = 0; i < tmpStr.length(); ++i) {
+        m_buffer[i] = tmpStr[i];
+    }
+
+    return (int)tmpStr.length();
 }
 
 void CServer::sendMessage(int c_sockfd, const char *message, int mlen) const
@@ -262,6 +264,7 @@ int CServer::receiveMessage(int c_sockfd, size_t expectedLen)
 
     while(true)
     {
+
         foundPos = tmpContainer.find("\\a\\b");
 
         if(foundPos != string::npos)
