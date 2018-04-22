@@ -6,10 +6,10 @@
 #include <unistd.h>
 #include <thread>
 #include <vector>
+#include <queue>
 
 using namespace std;
 
-const int BUFFSIZE = 1000;
 
 #define SERVER_MOVE "102 MOVE\\a\\b"
 #define SERVER_TURN_LEFT "103 TURN LEFT\\a\\b"
@@ -24,6 +24,18 @@ const int BUFFSIZE = 1000;
 #define SERVER_LOGIN_FAILED_LEN 22
 #define SERVER_OK_LEN 12
 
+#define CLIENT_USERNAME_LEN 12
+#define CLIENT_CONFIRMATION_LEN 7
+#define CLIENT_OK_LEN 12
+#define CLIENT_RECHARGING_LEN 12
+#define CLIENT_FULL_POWER_LEN 12
+#define CLIENT_MESSAGE_LEN 100
+
+
+
+class ComunicationException{};
+class SyntaxError{};
+
 class CServer
 {
 public:
@@ -35,19 +47,24 @@ public:
 
 private:
     const int ECHOPORT = 5599;
-    const unsigned short int CLIENT_KEY = 45328;
-    const unsigned short int SERVER_KEY = 54621;
+    const int BUFFSIZE = 1000;
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
     int m_my_sockfd;
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
+    char m_buffer[1000];
+    queue<string> m_commands;
 
 
     void setUpSocket();
     void run();
     void clientRoutine(int c_sockfd);
     bool authenticate(int c_sockfd);
-    unsigned short makeHash(const char * buff, int mLen);
-    void putCodeIntoBuffer(char * buff, unsigned short code);
+    unsigned short makeHash();
+    void putCodeIntoBuffer(unsigned short code);
+    void sendMessage(int c_sockfd, const char *message, int mlen) const;
+    int receiveMessage(int c_sockfd, size_t expectedLen);
 };
 
 void CServer::setUpSocket()
@@ -96,34 +113,49 @@ void CServer::run()
 void CServer::clientRoutine(int c_sockfd)
 {
     int mlen;
-    char buf[BUFFSIZE];
 
-//        CAuthentication auth(c_sockfd);
+    try {
+        if(!authenticate(c_sockfd)) {
+            cout << "Authentication failed\n";
 
-    if(!authenticate(c_sockfd)) {
-        if (write(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN) == -1)
-            perror("write error");
+            sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+            close(c_sockfd);
+            return;
+        } else
+            sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+    }
+    catch (SyntaxError e) {
+        cout << "Authentication failed\n";
+
+        sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
-    } else
-    if (write(c_sockfd, SERVER_OK, SERVER_OK_LEN) == -1)
-        perror("write error");
+    }
+
+
+    //robot creation here
 
     cout << "Authentication was successful\n";
 
     while (1) {
-        if ((mlen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-            perror("read error");
+
+        try {
+            mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
+        }
+        catch (ComunicationException e) {
             break;
         }
+
 
         if(mlen == 0)
             break;
 
-        printf("Client #%d: %s\n", c_sockfd, buf);
+        printf("Client #%d: %s\n", c_sockfd, m_buffer);
 
-        if (write(c_sockfd, SERVER_MOVE, mlen) == -1) {
-            perror("write error");
+        try {
+            sendMessage(c_sockfd, m_buffer, mlen);
+        }
+        catch (ComunicationException e) {
             break;
         }
 
@@ -135,70 +167,141 @@ void CServer::clientRoutine(int c_sockfd)
 bool CServer::authenticate(int c_sockfd)
 {
     int messLen;
-    char buf[BUFFSIZE];
 
     cout << "Waiting for username...\n";
     //getting username
-    if ((messLen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-        perror("read error");
+    try {
+        messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
+    }
+    catch (ComunicationException e) {
         return false;
     }
+    catch(SyntaxError e) {
+        throw SyntaxError();
+    }
 
-    unsigned short hash = makeHash(buf, messLen);
+    unsigned short hash = makeHash();
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
 
-    putCodeIntoBuffer(buf, confirmationCode);
-
-//            printf("Client #%d: %s\n", c_sockfd, buf);
+    putCodeIntoBuffer(confirmationCode);
 
     //sending code to the client
-    if (write(c_sockfd, buf, 5) == -1) {
-        perror("write error");
+    try {
+        sendMessage(c_sockfd, m_buffer, 5);
+    }
+    catch (ComunicationException e) {
         return false;
     }
 
     unsigned short expected = (hash + CLIENT_KEY) % 65536;
     cout << "expecting code: " << expected << endl;
 
-    //getting client's response
-    if ((messLen = read(c_sockfd, buf, BUFFSIZE)) == -1) {
-        perror("read error");
-        return false;
+    if(m_commands.empty()) {
+        //getting client's response
+        try {
+            messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
+        }
+        catch (ComunicationException e) {
+            return false;
+        }
     }
 
-    char response[5];
-    response[0] = buf[0];
-    response[1] = buf[1];
-    response[2] = buf[2];
-    response[3] = buf[3];
-    response[4] = buf[4];
+    string response(m_commands.front());
+    m_commands.pop();
 
-    unsigned short clientConfirmationCode = (unsigned short)atoi(response);
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
 //         unsigned short int expected = (hash + CLIENT_KEY) % 65536;
 
     return expected == clientConfirmationCode;
 }
 
-unsigned short CServer::makeHash(const char * buff, int mLen)
+unsigned short CServer::makeHash()
 {
-    int usernameLen = mLen - 4;
     unsigned short hash = 0;
-    for(int i = 0; i < usernameLen; i++) {
-        hash += buff[i];
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
     }
     hash = (hash * 1000) % 65536;
     return hash;
 }
 
-void CServer::putCodeIntoBuffer(char *buff, unsigned short code)
+void CServer::putCodeIntoBuffer(unsigned short code)
 {
-    buff[0] = (char)(code / 4);
-    buff[1] = (char)((code / 3) % 10);
-    buff[2] = (char)((code / 2) % 10);
-    buff[3] = (char)((code / 1) % 10);
-    buff[4] = (char)(code % 10);
+    m_buffer[0] = (char)(code / 4);
+    m_buffer[1] = (char)((code / 3) % 10);
+    m_buffer[2] = (char)((code / 2) % 10);
+    m_buffer[3] = (char)((code / 1) % 10);
+    m_buffer[4] = (char)(code % 10);
 }
+
+void CServer::sendMessage(int c_sockfd, const char *message, int mlen) const
+{
+    if (send(c_sockfd, message, mlen, 0) == -1) {
+        perror("write error");
+        throw ComunicationException();
+    }
+}
+
+int CServer::receiveMessage(int c_sockfd, size_t expectedLen)
+{
+    int mlen = 0;
+    string tmpContainer;
+    size_t foundPos;
+    bool foundBool = false;
+
+    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+    {
+        perror("read error");
+        throw ComunicationException();
+    }
+
+    tmpContainer.append(m_buffer, mlen);
+
+    while(true)
+    {
+        foundPos = tmpContainer.find("\\a\\b");
+
+        if(foundPos != string::npos)
+        {
+            foundBool = true;
+            string tmpCommand(tmpContainer, 0, foundPos);
+            m_commands.push(tmpCommand);
+            tmpContainer.erase(0, foundPos + 4);
+            if(!tmpContainer.empty()) {
+                continue;
+            }
+            break;
+        }
+        else {
+
+            if(!foundBool && tmpContainer.size() > expectedLen)
+                throw SyntaxError();
+
+            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+                perror("write error");
+                throw ComunicationException();
+            }
+
+            if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+            {
+                perror("read error");
+                throw ComunicationException();
+            }
+
+            if(mlen == 0)
+                throw ComunicationException();
+
+            tmpContainer.append(m_buffer, mlen);
+        }
+    }
+
+    return (int)m_commands.front().length();
+}
+
+
 
 int main()
 {
