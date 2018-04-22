@@ -114,12 +114,20 @@ void CServer::clientRoutine(int c_sockfd)
 {
     int mlen;
 
-    if(!authenticate(c_sockfd)) {
+    try {
+        if(!authenticate(c_sockfd)) {
+            sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+            close(c_sockfd);
+            return;
+        } else
+            sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+    }
+    catch (SyntaxError e) {
         sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
-    } else
-        sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+    }
+
 
     //robot creation here
 
@@ -241,43 +249,59 @@ int CServer::receiveMessage(int c_sockfd, size_t expectedLen)
 {
     int mlen = 0;
     string tmpContainer;
-    size_t found;
+    size_t foundPos;
+    bool foundBool = false;
 
-        if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+    {
+        perror("read error");
+        throw ComunicationException();
+    }
+
+    tmpContainer.append(m_buffer, mlen);
+
+    while(true)
+    {
+        foundPos = tmpContainer.find("\\a\\b");
+
+        if(foundPos != string::npos)
         {
-            perror("read error");
-            throw ComunicationException();
-        }
-
-        tmpContainer.append(m_buffer, mlen);
-
-        while(true)
-        {
-            found = tmpContainer.find("\\a\\b");
-
-            if(found != string::npos)
-            {
-                string tmpCommand(tmpContainer, 0, found);
-                m_commands.push(tmpCommand);
-                tmpContainer.erase(0, found + 4);
-                if(!tmpContainer.empty())
-                    continue;
-                break;
+            foundBool = true;
+            string tmpCommand(tmpContainer, 0, foundPos);
+            m_commands.push(tmpCommand);
+            tmpContainer.erase(0, foundPos + 4);
+            if(!tmpContainer.empty()) {
+                continue;
             }
-            else if(tmpContainer.size() > expectedLen)
+            break;
+        }
+        else {
+
+            if(!foundBool && tmpContainer.size() > expectedLen)
                 throw SyntaxError();
-            else {
-                if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
-                {
-                    perror("read error");
-                    throw ComunicationException();
-                }
-                tmpContainer.append(m_buffer, mlen);
+
+            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+                perror("write error");
+                throw ComunicationException();
             }
+
+            if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+            {
+                perror("read error");
+                throw ComunicationException();
+            }
+
+            if(mlen == 0)
+                throw ComunicationException();
+
+            tmpContainer.append(m_buffer, mlen);
         }
+    }
 
     return (int)m_commands.front().length();
 }
+
+
 
 int main()
 {
