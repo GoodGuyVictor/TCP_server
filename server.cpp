@@ -116,6 +116,8 @@ void CServer::clientRoutine(int c_sockfd)
 
     try {
         if(!authenticate(c_sockfd)) {
+            cout << "Authentication failed\n";
+
             sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
             close(c_sockfd);
             return;
@@ -123,6 +125,8 @@ void CServer::clientRoutine(int c_sockfd)
             sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
     }
     catch (SyntaxError e) {
+        cout << "Authentication failed\n";
+
         sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
@@ -181,8 +185,6 @@ bool CServer::authenticate(int c_sockfd)
 
     putCodeIntoBuffer(confirmationCode);
 
-//            printf("Client #%d: %s\n", c_sockfd, buf);
-
     //sending code to the client
     try {
         sendMessage(c_sockfd, m_buffer, 5);
@@ -194,22 +196,20 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short expected = (hash + CLIENT_KEY) % 65536;
     cout << "expecting code: " << expected << endl;
 
-    //getting client's response
-    try {
-        messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
-    }
-    catch (ComunicationException e) {
-        return false;
+    if(m_commands.empty()) {
+        //getting client's response
+        try {
+            messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
+        }
+        catch (ComunicationException e) {
+            return false;
+        }
     }
 
-    char response[5];
-    response[0] = m_buffer[0];
-    response[1] = m_buffer[1];
-    response[2] = m_buffer[2];
-    response[3] = m_buffer[3];
-    response[4] = m_buffer[4];
+    string response(m_commands.front());
+    m_commands.pop();
 
-    unsigned short clientConfirmationCode = (unsigned short)atoi(response);
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
 //         unsigned short int expected = (hash + CLIENT_KEY) % 65536;
 
