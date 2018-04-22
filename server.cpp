@@ -62,7 +62,7 @@ private:
     void clientRoutine(int c_sockfd);
     bool authenticate(int c_sockfd);
     unsigned short makeHash();
-    void putCodeIntoBuffer(char * buff, unsigned short code);
+    void putCodeIntoBuffer(unsigned short code);
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
 };
@@ -171,7 +171,7 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short hash = makeHash();
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
 
-    putCodeIntoBuffer(m_buffer, confirmationCode);
+    putCodeIntoBuffer(confirmationCode);
 
 //            printf("Client #%d: %s\n", c_sockfd, buf);
 
@@ -220,13 +220,13 @@ unsigned short CServer::makeHash()
     return hash;
 }
 
-void CServer::putCodeIntoBuffer(char *buff, unsigned short code)
+void CServer::putCodeIntoBuffer(unsigned short code)
 {
-    buff[0] = (char)(code / 4);
-    buff[1] = (char)((code / 3) % 10);
-    buff[2] = (char)((code / 2) % 10);
-    buff[3] = (char)((code / 1) % 10);
-    buff[4] = (char)(code % 10);
+    m_buffer[0] = (char)(code / 4);
+    m_buffer[1] = (char)((code / 3) % 10);
+    m_buffer[2] = (char)((code / 2) % 10);
+    m_buffer[3] = (char)((code / 1) % 10);
+    m_buffer[4] = (char)(code % 10);
 }
 
 void CServer::sendMessage(int c_sockfd, const char *message, int mlen) const
