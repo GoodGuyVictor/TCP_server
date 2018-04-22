@@ -61,7 +61,7 @@ private:
     void run();
     void clientRoutine(int c_sockfd);
     bool authenticate(int c_sockfd);
-    unsigned short makeHash(const char * buff, int mLen);
+    unsigned short makeHash();
     void putCodeIntoBuffer(char * buff, unsigned short code);
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
@@ -168,7 +168,7 @@ bool CServer::authenticate(int c_sockfd)
         throw SyntaxError();
     }
 
-    unsigned short hash = makeHash(m_buffer, messLen);
+    unsigned short hash = makeHash();
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
 
     putCodeIntoBuffer(m_buffer, confirmationCode);
@@ -208,12 +208,13 @@ bool CServer::authenticate(int c_sockfd)
     return expected == clientConfirmationCode;
 }
 
-unsigned short CServer::makeHash(const char * buff, int mLen)
+unsigned short CServer::makeHash()
 {
-    int usernameLen = mLen - 4;
     unsigned short hash = 0;
-    for(int i = 0; i < usernameLen; i++) {
-        hash += buff[i];
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
     }
     hash = (hash * 1000) % 65536;
     return hash;
