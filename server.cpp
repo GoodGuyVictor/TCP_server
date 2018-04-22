@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <sstream>
 
 using namespace std;
 
@@ -21,22 +22,108 @@ using namespace std;
 #define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\\a\\b"
 #define SERVER_LOGIC_ERROR "302 LOGIC ERROR\\a\\b"
 
-#define SERVER_LOGIN_FAILED_LEN 22
-#define SERVER_OK_LEN 12
+#define SERVER_MOVE_LEN 12
+#define SERVER_TURN_LEFT_LEN 17
+#define SERVER_TURN_RIGHT_LEN 18
+#define SERVER_PICK_UP_LEN 19
+#define SERVER_LOGOUT_LEN 15
+#define SERVER_OK_LEN 10
+#define SERVER_LOGIN_FAILED_LEN 20
+#define SERVER_SYNTAX_ERROR_LEN 20
+#define SERVER_LOGIC_ERROR_LEN 19
 
 #define CLIENT_USERNAME_LEN 12
 #define CLIENT_CONFIRMATION_LEN 7
-#define CLIENT_OK_LEN 12
+#define CLIENT_OK_LEN 99999
 #define CLIENT_RECHARGING_LEN 12
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
 
-
+queue<string> g_commands;
 
 class ComunicationException{};
 class SyntaxError{};
 
-class CServer
+class CRobot
+{
+public:
+
+private:
+    int m_x;
+    int m_y;
+};
+
+class CMessenger
+{
+protected:
+    char m_buffer[1000];
+    const int BUFFSIZE = 1000;
+
+    void sendMessage(int c_sockfd, const char *message, int mlen) const;
+    int receiveMessage(int c_sockfd, size_t expectedLen);
+};
+
+void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen) const
+{
+    if (send(c_sockfd, message, mlen, 0) == -1) {
+        perror("write error");
+        throw ComunicationException();
+    }
+}
+
+int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
+{
+    int mlen = 0;
+    string tmpContainer;
+    size_t foundPos;
+    bool foundBool = false;
+
+    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+    {
+        perror("read error");
+        throw ComunicationException();
+    }
+
+    tmpContainer.append(m_buffer, mlen);
+
+    while(true) {
+        cout << m_buffer << endl;
+        foundPos = tmpContainer.find("\\a\\b");
+
+        if (foundPos != string::npos) {
+            foundBool = true;
+            string tmpCommand(tmpContainer, 0, foundPos);
+            g_commands.push(tmpCommand);
+            tmpContainer.erase(0, foundPos + 4);
+            if (!tmpContainer.empty()) {
+                continue;
+            }
+            break;
+        } else {
+
+            if (!foundBool && tmpContainer.size() > expectedLen)
+                throw SyntaxError();
+
+            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+                perror("write error");
+                throw ComunicationException();
+            }
+
+            if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
+                perror("read error");
+                throw ComunicationException();
+            }
+
+            if (mlen == 0)
+                throw ComunicationException();
+
+            tmpContainer.append(m_buffer, mlen);
+        }
+    }
+    return (int)g_commands.front().length();
+}
+
+class CServer : public CMessenger
 {
 public:
     CServer()
@@ -47,14 +134,22 @@ public:
 
 private:
     const int ECHOPORT = 5599;
-    const int BUFFSIZE = 1000;
     const unsigned short CLIENT_KEY = 45328;
     const unsigned short SERVER_KEY = 54621;
     int m_my_sockfd;
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
-    char m_buffer[1000];
-    queue<string> m_commands;
+
+    class CRobot {
+    private:
+        int m_sockfd;
+        int m_x;
+        int m_y;
+    public:
+        CRobot(int c_sockfd);
+        void move();
+        void extractCoords(string str);
+    };
 
 
     void setUpSocket();
@@ -63,8 +158,6 @@ private:
     bool authenticate(int c_sockfd);
     unsigned short makeHash();
     int putCodeIntoBuffer(unsigned short code);
-    void sendMessage(int c_sockfd, const char *message, int mlen) const;
-    int receiveMessage(int c_sockfd, size_t expectedLen);
 };
 
 void CServer::setUpSocket()
@@ -137,7 +230,12 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    while (1) {
+    CRobot robot(c_sockfd);
+
+    robot.move();
+    robot.move();
+
+    /*while (1) {
 
         try {
             mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
@@ -160,7 +258,7 @@ void CServer::clientRoutine(int c_sockfd)
         }
 
         printf("sending %i bytes back to the client\n", mlen);
-    }
+    }*/
     close(c_sockfd);
 }
 
@@ -196,8 +294,8 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short expected = (hash + CLIENT_KEY) % 65536;
     cout << "expecting code: " << expected << endl;
 
-    if(m_commands.empty()) {
-        //getting client's response
+    if(g_commands.empty()) {
+        //getting client's code
         try {
             messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
         }
@@ -206,8 +304,8 @@ bool CServer::authenticate(int c_sockfd)
         }
     }
 
-    string response(m_commands.front());
-    m_commands.pop();
+    string response(g_commands.front());
+    g_commands.pop();
 
     unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
@@ -219,8 +317,8 @@ bool CServer::authenticate(int c_sockfd)
 unsigned short CServer::makeHash()
 {
     unsigned short hash = 0;
-    string username(m_commands.front());
-    m_commands.pop();
+    string username(g_commands.front());
+    g_commands.pop();
     for(int i = 0; i < username.length(); i++) {
         hash += username[i];
     }
@@ -239,75 +337,53 @@ int CServer::putCodeIntoBuffer(unsigned short code)
     return (int)tmpStr.length();
 }
 
-void CServer::sendMessage(int c_sockfd, const char *message, int mlen) const
+
+CServer::CRobot::CRobot(int c_sockfd)
+    :m_sockfd(c_sockfd), m_x(0), m_y(0)
 {
-    if (send(c_sockfd, message, mlen, 0) == -1) {
-        perror("write error");
-        throw ComunicationException();
-    }
 }
 
-int CServer::receiveMessage(int c_sockfd, size_t expectedLen)
+void CServer::CRobot::move()
 {
-    int mlen = 0;
-    string tmpContainer;
-    size_t foundPos;
-    bool foundBool = false;
-
-    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
-    {
-        perror("read error");
-        throw ComunicationException();
+    if(g_commands.empty()) {
+        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
     }
-
-    tmpContainer.append(m_buffer, mlen);
-
-    while(true)
-    {
-
-        foundPos = tmpContainer.find("\\a\\b");
-
-        if(foundPos != string::npos)
-        {
-            foundBool = true;
-            string tmpCommand(tmpContainer, 0, foundPos);
-            m_commands.push(tmpCommand);
-            tmpContainer.erase(0, foundPos + 4);
-            if(!tmpContainer.empty()) {
-                continue;
-            }
-            break;
-        }
-        else {
-
-            if(!foundBool && tmpContainer.size() > expectedLen)
-                throw SyntaxError();
-
-            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-                perror("write error");
-                throw ComunicationException();
-            }
-
-            if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
-            {
-                perror("read error");
-                throw ComunicationException();
-            }
-
-            if(mlen == 0)
-                throw ComunicationException();
-
-            tmpContainer.append(m_buffer, mlen);
-        }
-    }
-
-    return (int)m_commands.front().length();
+    extractCoords(g_commands.front());
 }
+
+void CServer::CRobot::extractCoords(string str)
+{
+    stringstream ss;
+    vector<int> tmpVec;
+
+    /* Storing the whole string into string stream */
+    ss << str;
+
+    /* Running loop till the end of the stream */
+    string temp;
+    int found;
+    while (!ss.eof()) {
+
+        /* extracting word by word from stream */
+        ss >> temp;
+
+        /* Checking the given word is integer or not */
+        if (stringstream(temp) >> found) {
+            tmpVec.push_back(found);
+        }
+    }
+    m_x = tmpVec[0];
+    m_y = tmpVec[1];
+}
+
+
 
 
 
 int main()
 {
+
 
     CServer server;
 
