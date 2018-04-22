@@ -90,8 +90,14 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
-        cout << m_buffer << endl;
-        foundPos = tmpContainer.find("\\a\\b");
+        cout << "buffer: "<< m_buffer << endl;
+
+        if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+            perror("write error");
+            throw ComunicationException();
+        }
+
+        foundPos = tmpContainer.find("\a\b");
 
         if (foundPos != string::npos) {
             foundBool = true;
@@ -104,13 +110,11 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
             break;
         } else {
 
-            if (!foundBool && tmpContainer.size() > expectedLen)
+            cout << "not found" << endl;
+            if (!foundBool && tmpContainer.size() > expectedLen){
                 throw SyntaxError();
-
-            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-                perror("write error");
-                throw ComunicationException();
             }
+
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
@@ -123,6 +127,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
             tmpContainer.append(m_buffer, mlen);
         }
     }
+    cout << "successfully" << endl;
     return (int)m_commands.front().length();
 }
 
