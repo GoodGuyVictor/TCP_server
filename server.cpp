@@ -39,18 +39,20 @@ using namespace std;
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
 
-queue<string> g_commands;
+//queue<string> g_commands;
 
 class ComunicationException{};
 class SyntaxError{};
 
-class CRobot
-{
-public:
-
+class CRobot {
 private:
+    int m_sockfd;
     int m_x;
     int m_y;
+public:
+    CRobot(int c_sockfd);
+    void move();
+    void extractCoords(string str);
 };
 
 class CMessenger
@@ -58,6 +60,7 @@ class CMessenger
 protected:
     char m_buffer[1000];
     const int BUFFSIZE = 1000;
+    queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
@@ -93,7 +96,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
         if (foundPos != string::npos) {
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
-            g_commands.push(tmpCommand);
+            m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 4);
             if (!tmpContainer.empty()) {
                 continue;
@@ -120,7 +123,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
             tmpContainer.append(m_buffer, mlen);
         }
     }
-    return (int)g_commands.front().length();
+    return (int)m_commands.front().length();
 }
 
 class CServer : public CMessenger
@@ -140,16 +143,7 @@ private:
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
 
-    class CRobot {
-    private:
-        int m_sockfd;
-        int m_x;
-        int m_y;
-    public:
-        CRobot(int c_sockfd);
-        void move();
-        void extractCoords(string str);
-    };
+
 
 
     void setUpSocket();
@@ -230,12 +224,12 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    CRobot robot(c_sockfd);
+//    CRobot robot(c_sockfd);
 
-    robot.move();
-    robot.move();
+//    robot.move();
+//    robot.move();
 
-    /*while (1) {
+    while (1) {
 
         try {
             mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
@@ -258,7 +252,7 @@ void CServer::clientRoutine(int c_sockfd)
         }
 
         printf("sending %i bytes back to the client\n", mlen);
-    }*/
+    }
     close(c_sockfd);
 }
 
@@ -294,7 +288,7 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short expected = (hash + CLIENT_KEY) % 65536;
     cout << "expecting code: " << expected << endl;
 
-    if(g_commands.empty()) {
+    if(m_commands.empty()) {
         //getting client's code
         try {
             messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
@@ -304,8 +298,8 @@ bool CServer::authenticate(int c_sockfd)
         }
     }
 
-    string response(g_commands.front());
-    g_commands.pop();
+    string response(m_commands.front());
+    m_commands.pop();
 
     unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
@@ -317,8 +311,8 @@ bool CServer::authenticate(int c_sockfd)
 unsigned short CServer::makeHash()
 {
     unsigned short hash = 0;
-    string username(g_commands.front());
-    g_commands.pop();
+    string username(m_commands.front());
+    m_commands.pop();
     for(int i = 0; i < username.length(); i++) {
         hash += username[i];
     }
@@ -338,44 +332,44 @@ int CServer::putCodeIntoBuffer(unsigned short code)
 }
 
 
-CServer::CRobot::CRobot(int c_sockfd)
-    :m_sockfd(c_sockfd), m_x(0), m_y(0)
-{
-}
+//CServer::CRobot::CRobot(int c_sockfd)
+//    :m_sockfd(c_sockfd), m_x(0), m_y(0)
+//{
+//}
 
-void CServer::CRobot::move()
-{
-    if(g_commands.empty()) {
-        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
-    }
-    extractCoords(g_commands.front());
-}
-
-void CServer::CRobot::extractCoords(string str)
-{
-    stringstream ss;
-    vector<int> tmpVec;
-
-    /* Storing the whole string into string stream */
-    ss << str;
-
-    /* Running loop till the end of the stream */
-    string temp;
-    int found;
-    while (!ss.eof()) {
-
-        /* extracting word by word from stream */
-        ss >> temp;
-
-        /* Checking the given word is integer or not */
-        if (stringstream(temp) >> found) {
-            tmpVec.push_back(found);
-        }
-    }
-    m_x = tmpVec[0];
-    m_y = tmpVec[1];
-}
+//void CServer::CRobot::move()
+//{
+//    if(g_commands.empty()) {
+//        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
+//        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+//    }
+//    extractCoords(g_commands.front());
+//}
+//
+//void CServer::CRobot::extractCoords(string str)
+//{
+//    stringstream ss;
+//    vector<int> tmpVec;
+//
+//    /* Storing the whole string into string stream */
+//    ss << str;
+//
+//    /* Running loop till the end of the stream */
+//    string temp;
+//    int found;
+//    while (!ss.eof()) {
+//
+//        /* extracting word by word from stream */
+//        ss >> temp;
+//
+//        /* Checking the given word is integer or not */
+//        if (stringstream(temp) >> found) {
+//            tmpVec.push_back(found);
+//        }
+//    }
+//    m_x = tmpVec[0];
+//    m_y = tmpVec[1];
+//}
 
 
 
