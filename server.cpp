@@ -294,7 +294,6 @@ void CServer::clientRoutine(int c_sockfd)
         close(c_sockfd);
         return;
     }
-//    robot.move();
 
     while (1) {
 
