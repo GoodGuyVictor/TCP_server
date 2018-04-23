@@ -51,11 +51,13 @@ class CMessenger
 protected:
     char m_buffer[1000];
     const int BUFFSIZE = 1000;
-    queue<string> m_commands;
+    static queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
 };
+
+queue<string> CMessenger::m_commands;
 
 void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
@@ -69,6 +71,9 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
 
 int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 {
+    if(!m_commands.empty())
+        return (int)m_commands.front().length();
+
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
@@ -125,13 +130,11 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 
 class CRobot : public CMessenger {
 private:
-    const char * MOVE = "102 MOVE\a\b";
     int m_sockfd;
     int m_x;
     int m_y;
-    queue<string> m_commands;
 public:
-    CRobot(int c_sockfd, queue<string> & commands);
+    CRobot(int c_sockfd);
     void move();
     void extractCoords(string str);
 };
@@ -140,16 +143,13 @@ void CRobot::move()
 {
     cout << "Robot moves\n";
     sendMessage(m_sockfd, SERVER_MOVE);
-    if(m_commands.empty()) {
-        cout << "Empty bro: " << m_commands.front() << endl;
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
-    }
+    receiveMessage(m_sockfd, CLIENT_OK_LEN);
     extractCoords(m_commands.front());
     m_commands.pop();
 }
 
-CRobot::CRobot(int c_sockfd, queue<string> & commands)
-        :m_sockfd(c_sockfd), m_x(0), m_y(0), m_commands(commands)
+CRobot::CRobot(int c_sockfd)
+        :m_sockfd(c_sockfd), m_x(0), m_y(0)
 {
 }
 
@@ -283,7 +283,7 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    CRobot robot(c_sockfd, m_commands);
+    CRobot robot(c_sockfd);
 //
     try {
         robot.move();
@@ -344,8 +344,7 @@ void CServer::authenticate(int c_sockfd)
     cout << "expecting code: " << expected << endl;
 
     //getting client's code
-    if(m_commands.empty())
-        messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
+    messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
 
     string response(m_commands.front());
     m_commands.pop();
