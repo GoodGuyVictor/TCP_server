@@ -84,6 +84,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 
     while(true) {
         cout << "buffer: "<< m_buffer << endl;
+//        printf("buffer: %s\n", m_buffer);
 
         foundPos = tmpContainer.find(POSTFIX);
 
@@ -128,8 +129,9 @@ private:
     int m_sockfd;
     int m_x;
     int m_y;
+    queue<string> m_commands;
 public:
-    CRobot(int c_sockfd);
+    CRobot(int c_sockfd, queue<string> & commands);
     void move();
     void extractCoords(string str);
 };
@@ -137,15 +139,16 @@ public:
 void CRobot::move()
 {
     cout << "Robot moves\n";
+    sendMessage(m_sockfd, SERVER_MOVE);
     if(m_commands.empty()) {
-        sendMessage(m_sockfd, SERVER_MOVE);
+        cout << "Empty bro: " << m_commands.front() << endl;
         receiveMessage(m_sockfd, CLIENT_OK_LEN);
     }
     extractCoords(m_commands.front());
 }
 
-CRobot::CRobot(int c_sockfd)
-        :m_sockfd(c_sockfd), m_x(0), m_y(0)
+CRobot::CRobot(int c_sockfd, queue<string> & commands)
+        :m_sockfd(c_sockfd), m_x(0), m_y(0), m_commands(commands)
 {
 }
 
@@ -279,9 +282,10 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    CRobot robot(c_sockfd);
+    CRobot robot(c_sockfd, m_commands);
 //
     try {
+        robot.move();
         robot.move();
     }
     catch(CommunicationError e) {
