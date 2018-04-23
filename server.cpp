@@ -22,15 +22,15 @@ using namespace std;
 #define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\a\b"
 #define SERVER_LOGIC_ERROR "302 LOGIC ERROR\a\b"
 
-#define SERVER_MOVE_LEN 12
-#define SERVER_TURN_LEFT_LEN 17
-#define SERVER_TURN_RIGHT_LEN 18
-#define SERVER_PICK_UP_LEN 19
-#define SERVER_LOGOUT_LEN 15
-#define SERVER_OK_LEN 10
-#define SERVER_LOGIN_FAILED_LEN 20
-#define SERVER_SYNTAX_ERROR_LEN 20
-#define SERVER_LOGIC_ERROR_LEN 19
+//#define SERVER_MOVE_LEN 10
+//#define SERVER_TURN_LEFT_LEN 17
+//#define SERVER_TURN_RIGHT_LEN 18
+//#define SERVER_PICK_UP_LEN 19
+//#define SERVER_LOGOUT_LEN 15
+//#define SERVER_OK_LEN 8
+//#define SERVER_LOGIN_FAILED_LEN 20
+//#define SERVER_SYNTAX_ERROR_LEN 20
+//#define SERVER_LOGIC_ERROR_LEN 19
 
 #define CLIENT_USERNAME_LEN 12
 #define CLIENT_CONFIRMATION_LEN 7
@@ -57,8 +57,10 @@ protected:
     int receiveMessage(int c_sockfd, size_t expectedLen);
 };
 
-void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen) const
+void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
+    if(mlen == 0)
+        mlen = strlen(message);
     if (send(c_sockfd, message, mlen, 0) == -1) {
         perror("write error");
         throw CommunicationError();
@@ -122,6 +124,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 
 class CRobot : public CMessenger {
 private:
+    const char * MOVE = "102 MOVE\a\b";
     int m_sockfd;
     int m_x;
     int m_y;
@@ -133,8 +136,9 @@ public:
 
 void CRobot::move()
 {
+    cout << "Robot moves\n";
     if(m_commands.empty()) {
-        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
+        sendMessage(m_sockfd, SERVER_MOVE);
         receiveMessage(m_sockfd, CLIENT_OK_LEN);
     }
     extractCoords(m_commands.front());
@@ -249,23 +253,23 @@ void CServer::clientRoutine(int c_sockfd)
 
     try {
         authenticate(c_sockfd);
-        sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+        sendMessage(c_sockfd, SERVER_OK);
     }
     catch (SyntaxError e) {
         cout << "Syntax error\n";
-        sendMessage(c_sockfd, SERVER_SYNTAX_ERROR, SERVER_SYNTAX_ERROR_LEN);
+        sendMessage(c_sockfd, SERVER_SYNTAX_ERROR);
         close(c_sockfd);
         return;
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
-        sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+        sendMessage(c_sockfd, SERVER_LOGIN_FAILED);
         close(c_sockfd);
         return;
     }
     catch(LoginError e) {
         cout << "Login error\n";
-        sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+        sendMessage(c_sockfd, SERVER_LOGIN_FAILED);
         close(c_sockfd);
         return;
     }
