@@ -91,7 +91,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
             m_commands.push(tmpCommand);
-            tmpContainer.erase(0, foundPos + 4);
+            tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
                 continue;
             break;
