@@ -136,7 +136,7 @@ private:
 public:
     CRobot(int c_sockfd);
     void move();
-    void extractCoords(string str);
+    void extractCoords(const string & str);
 };
 
 void CRobot::move()
@@ -153,7 +153,7 @@ CRobot::CRobot(int c_sockfd)
 {
 }
 
-void CRobot::extractCoords(string str)
+void CRobot::extractCoords(const string & str)
 {
     stringstream ss;
     vector<int> tmpVec;
