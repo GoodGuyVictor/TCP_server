@@ -59,11 +59,13 @@ protected:
 
 void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
-    if(mlen == 0)
-        mlen = strlen(message);
-    if (send(c_sockfd, message, mlen, 0) == -1) {
-        perror("write error");
-        throw CommunicationError();
+    if(m_commands.empty()) {
+        if(mlen == 0)
+            mlen = strlen(message);
+        if (send(c_sockfd, message, mlen, 0) == -1) {
+            perror("write error");
+            throw CommunicationError();
+        }
     }
 }
 
@@ -283,13 +285,13 @@ void CServer::clientRoutine(int c_sockfd)
 //
     try {
         robot.move();
+        robot.move();
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
         close(c_sockfd);
         return;
     }
-//    robot.move();
 
     while (1) {
 
