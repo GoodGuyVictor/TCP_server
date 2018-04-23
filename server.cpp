@@ -145,6 +145,7 @@ void CRobot::move()
         receiveMessage(m_sockfd, CLIENT_OK_LEN);
     }
     extractCoords(m_commands.front());
+    m_commands.pop();
 }
 
 CRobot::CRobot(int c_sockfd, queue<string> & commands)
