@@ -42,8 +42,9 @@ using namespace std;
 #define POSTFIX "\a\b"
 
 
-class ComunicationException{};
+class CommunicationError{};
 class SyntaxError{};
+class LoginError{};
 
 class CMessenger
 {
@@ -60,7 +61,7 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen) const
 {
     if (send(c_sockfd, message, mlen, 0) == -1) {
         perror("write error");
-        throw ComunicationException();
+        throw CommunicationError();
     }
 }
 
@@ -74,7 +75,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
     {
         perror("read error");
-        throw ComunicationException();
+        throw CommunicationError();
     }
 
     tmpContainer.append(m_buffer, mlen);
@@ -101,16 +102,16 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 
             if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
                 perror("write error");
-                throw ComunicationException();
+                throw CommunicationError();
             }
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
-                throw ComunicationException();
+                throw CommunicationError();
             }
 
             if (mlen == 0)
-                throw ComunicationException();
+                throw CommunicationError();
 
             tmpContainer.append(m_buffer, mlen);
         }
@@ -192,7 +193,7 @@ private:
     void setUpSocket();
     void run();
     void clientRoutine(int c_sockfd);
-    bool authenticate(int c_sockfd);
+    void authenticate(int c_sockfd);
     unsigned short makeHash();
     int putCodeIntoBuffer(unsigned short code);
 };
@@ -245,18 +246,23 @@ void CServer::clientRoutine(int c_sockfd)
     int mlen;
 
     try {
-        if(!authenticate(c_sockfd)) {
-            cout << "Authentication failed\n";
-
-            sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
-            close(c_sockfd);
-            return;
-        } else
-            sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
+        authenticate(c_sockfd);
+        sendMessage(c_sockfd, SERVER_OK, SERVER_OK_LEN);
     }
     catch (SyntaxError e) {
-        cout << "Authentication failed\n";
-
+        cout << "Syntax error\n";
+        sendMessage(c_sockfd, SERVER_SYNTAX_ERROR, SERVER_SYNTAX_ERROR_LEN);
+        close(c_sockfd);
+        return;
+    }
+    catch(CommunicationError e) {
+        cout << "Communication error\n";
+        sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
+        close(c_sockfd);
+        return;
+    }
+    catch(LoginError e) {
+        cout << "Login error\n";
         sendMessage(c_sockfd, SERVER_LOGIN_FAILED, SERVER_LOGIN_FAILED_LEN);
         close(c_sockfd);
         return;
@@ -267,9 +273,9 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-//    CRobot robot(c_sockfd);
+    CRobot robot(c_sockfd);
 //
-//    robot.move();
+    robot.move();
 //    robot.move();
 
     while (1) {
@@ -277,7 +283,7 @@ void CServer::clientRoutine(int c_sockfd)
         try {
             mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
         }
-        catch (ComunicationException e) {
+        catch (CommunicationError e) {
             break;
         }
 
@@ -290,7 +296,7 @@ void CServer::clientRoutine(int c_sockfd)
         try {
             sendMessage(c_sockfd, m_buffer, mlen);
         }
-        catch (ComunicationException e) {
+        catch (CommunicationError e) {
             break;
         }
 
@@ -299,49 +305,29 @@ void CServer::clientRoutine(int c_sockfd)
     close(c_sockfd);
 }
 
-bool CServer::authenticate(int c_sockfd)
+void CServer::authenticate(int c_sockfd)
 {
     int messLen;
 
     cout << "Waiting for username...\n";
     //getting username
-    try {
-        messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
-    }
-    catch (ComunicationException e) {
-        return false;
-    }
-    catch(SyntaxError e) {
-        throw SyntaxError();
-    }
+    messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
 
     unsigned short hash = makeHash();
     cout << "hash: " << hash << endl;
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
     cout << "confirmation code: " << confirmationCode << endl;
-
     int codeLen = putCodeIntoBuffer(confirmationCode);
 
     //sending code to the client
-    try {
-        sendMessage(c_sockfd, m_buffer, codeLen);
-    }
-    catch (ComunicationException e) {
-        return false;
-    }
+    sendMessage(c_sockfd, m_buffer, codeLen);
 
     unsigned short expected = (hash + CLIENT_KEY) % 65536;
     cout << "expecting code: " << expected << endl;
 
-    if(m_commands.empty()) {
-        //getting client's code
-        try {
-            messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
-        }
-        catch (ComunicationException e) {
-            return false;
-        }
-    }
+    //getting client's code
+    if(m_commands.empty())
+        messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
 
     string response(m_commands.front());
     m_commands.pop();
@@ -349,7 +335,9 @@ bool CServer::authenticate(int c_sockfd)
     unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
 
-    return expected == clientConfirmationCode;
+    if(expected != clientConfirmationCode) {
+        throw LoginError();
+    }
 }
 
 unsigned short CServer::makeHash()
