@@ -173,14 +173,16 @@ void CRobot::extractCoords(string str)
 class CServer : public CMessenger
 {
 public:
-    CServer()
+    CServer(int port)
+            : ECHOPORT(port)
     {
         setUpSocket();
         run();
     }
 
 private:
-    const int ECHOPORT = 5599;
+    // const int ECHOPORT = 5599;
+    int ECHOPORT;
     const unsigned short CLIENT_KEY = 45328;
     const unsigned short SERVER_KEY = 54621;
     int m_my_sockfd;
@@ -275,7 +277,14 @@ void CServer::clientRoutine(int c_sockfd)
 
     CRobot robot(c_sockfd);
 //
-    robot.move();
+    try {
+        robot.move();
+    }
+    catch(CommunicationError e) {
+        cout << "Communication error\n";
+        close(c_sockfd);
+        return;
+    }
 //    robot.move();
 
     while (1) {
@@ -365,28 +374,15 @@ int CServer::putCodeIntoBuffer(unsigned short code)
 }
 
 
-//CServer::CRobot::CRobot(int c_sockfd)
-
-
-//void CServer::CRobot::move()
-//{
-
-//}
-//
-//void CServer::CRobot::extractCoords(string str)
-//{
-
-//}
-
-
-
-
-
-int main()
+int main(int argc, char const *argv[])
 {
+    if(argc != 2) {
+        cout << "Usage: <port>\n";
+        return 1;
+    }
+    int port = atoi(argv[1]);
 
-
-    CServer server;
+    CServer server(port);
 
     return 0;
 }
