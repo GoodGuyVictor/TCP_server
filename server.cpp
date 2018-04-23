@@ -12,15 +12,15 @@
 using namespace std;
 
 
-#define SERVER_MOVE "102 MOVE\\a\\b"
-#define SERVER_TURN_LEFT "103 TURN LEFT\\a\\b"
-#define SERVER_TURN_RIGHT "104 TURN RIGHT\\a\\b"
-#define SERVER_PICK_UP "105 GET MESSAGE\\a\\b"
-#define SERVER_LOGOUT "106 LOGOUT\\a\\b"
-#define SERVER_OK "200 OK\\a\\b"
-#define SERVER_LOGIN_FAILED "300 LOGIN FAILED\\a\\b"
-#define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\\a\\b"
-#define SERVER_LOGIC_ERROR "302 LOGIC ERROR\\a\\b"
+#define SERVER_MOVE "102 MOVE\a\b"
+#define SERVER_TURN_LEFT "103 TURN LEFT\a\b"
+#define SERVER_TURN_RIGHT "104 TURN RIGHT\a\b"
+#define SERVER_PICK_UP "105 GET MESSAGE\a\b"
+#define SERVER_LOGOUT "106 LOGOUT\a\b"
+#define SERVER_OK "200 OK\a\b"
+#define SERVER_LOGIN_FAILED "300 LOGIN FAILED\a\b"
+#define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\a\b"
+#define SERVER_LOGIC_ERROR "302 LOGIC ERROR\a\b"
 
 #define SERVER_MOVE_LEN 12
 #define SERVER_TURN_LEFT_LEN 17
@@ -39,21 +39,11 @@ using namespace std;
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
 
-//queue<string> g_commands;
+#define POSTFIX "\a\b"
+
 
 class ComunicationException{};
 class SyntaxError{};
-
-class CRobot {
-private:
-    int m_sockfd;
-    int m_x;
-    int m_y;
-public:
-    CRobot(int c_sockfd);
-    void move();
-    void extractCoords(string str);
-};
 
 class CMessenger
 {
@@ -92,21 +82,15 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     while(true) {
         cout << "buffer: "<< m_buffer << endl;
 
-        if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-            perror("write error");
-            throw ComunicationException();
-        }
-
-        foundPos = tmpContainer.find("\a\b");
+        foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 4);
-            if (!tmpContainer.empty()) {
+            if (!tmpContainer.empty())
                 continue;
-            }
             break;
         } else {
 
@@ -115,6 +99,10 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
                 throw SyntaxError();
             }
 
+            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+                perror("write error");
+                throw ComunicationException();
+            }
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
@@ -129,6 +117,56 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     }
     cout << "successfully" << endl;
     return (int)m_commands.front().length();
+}
+
+class CRobot : public CMessenger {
+private:
+    int m_sockfd;
+    int m_x;
+    int m_y;
+public:
+    CRobot(int c_sockfd);
+    void move();
+    void extractCoords(string str);
+};
+
+void CRobot::move()
+{
+    if(m_commands.empty()) {
+        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+    }
+    extractCoords(m_commands.front());
+}
+
+CRobot::CRobot(int c_sockfd)
+        :m_sockfd(c_sockfd), m_x(0), m_y(0)
+{
+}
+
+void CRobot::extractCoords(string str)
+{
+    stringstream ss;
+    vector<int> tmpVec;
+
+    /* Storing the whole string into string stream */
+    ss << str;
+
+    /* Running loop till the end of the stream */
+    string temp;
+    int found;
+    while (!ss.eof()) {
+
+        /* extracting word by word from stream */
+        ss >> temp;
+
+        /* Checking the given word is integer or not */
+        if (stringstream(temp) >> found) {
+            tmpVec.push_back(found);
+        }
+    }
+    m_x = tmpVec[0];
+    m_y = tmpVec[1];
 }
 
 class CServer : public CMessenger
@@ -230,7 +268,7 @@ void CServer::clientRoutine(int c_sockfd)
     cout << "Authentication was successful\n";
 
 //    CRobot robot(c_sockfd);
-
+//
 //    robot.move();
 //    robot.move();
 
@@ -278,7 +316,9 @@ bool CServer::authenticate(int c_sockfd)
     }
 
     unsigned short hash = makeHash();
+    cout << "hash: " << hash << endl;
     unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
+    cout << "confirmation code: " << confirmationCode << endl;
 
     int codeLen = putCodeIntoBuffer(confirmationCode);
 
@@ -308,7 +348,6 @@ bool CServer::authenticate(int c_sockfd)
 
     unsigned short clientConfirmationCode = (unsigned short)stoi(response);
     cout << "client confirmation code: " << clientConfirmationCode << endl;
-//         unsigned short int expected = (hash + CLIENT_KEY) % 65536;
 
     return expected == clientConfirmationCode;
 }
@@ -329,6 +368,7 @@ int CServer::putCodeIntoBuffer(unsigned short code)
 {
 
     string tmpStr = to_string(code);
+    tmpStr += POSTFIX;
     for (int i = 0; i < tmpStr.length(); ++i) {
         m_buffer[i] = tmpStr[i];
     }
@@ -338,42 +378,16 @@ int CServer::putCodeIntoBuffer(unsigned short code)
 
 
 //CServer::CRobot::CRobot(int c_sockfd)
-//    :m_sockfd(c_sockfd), m_x(0), m_y(0)
-//{
-//}
+
 
 //void CServer::CRobot::move()
 //{
-//    if(g_commands.empty()) {
-//        sendMessage(m_sockfd, SERVER_MOVE, SERVER_MOVE_LEN);
-//        receiveMessage(m_sockfd, CLIENT_OK_LEN);
-//    }
-//    extractCoords(g_commands.front());
+
 //}
 //
 //void CServer::CRobot::extractCoords(string str)
 //{
-//    stringstream ss;
-//    vector<int> tmpVec;
-//
-//    /* Storing the whole string into string stream */
-//    ss << str;
-//
-//    /* Running loop till the end of the stream */
-//    string temp;
-//    int found;
-//    while (!ss.eof()) {
-//
-//        /* extracting word by word from stream */
-//        ss >> temp;
-//
-//        /* Checking the given word is integer or not */
-//        if (stringstream(temp) >> found) {
-//            tmpVec.push_back(found);
-//        }
-//    }
-//    m_x = tmpVec[0];
-//    m_y = tmpVec[1];
+
 //}
 
 
