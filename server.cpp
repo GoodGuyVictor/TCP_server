@@ -140,7 +140,9 @@ public:
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
-    void print() { printf("X: %d\nY: %d\n", m_position.first, m_position.second); }
+    void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
+                          m_position.first, m_position.second,
+                          m_prevPosition.first, m_prevPosition.second); }
 };
 
 void CRobot::move()
