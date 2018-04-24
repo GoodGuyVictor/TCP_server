@@ -131,12 +131,12 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 class CRobot : public CMessenger {
 private:
     int m_sockfd;
-    int m_x;
-    int m_y;
+    pair<int, int> m_position;
 public:
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
+    void print() { printf("X: %d\nY: %d\n", m_position.first, m_position.second); }
 };
 
 void CRobot::move()
@@ -146,10 +146,11 @@ void CRobot::move()
     receiveMessage(m_sockfd, CLIENT_OK_LEN);
     extractCoords(m_commands.front());
     m_commands.pop();
+    print();
 }
 
 CRobot::CRobot(int c_sockfd)
-        :m_sockfd(c_sockfd), m_x(0), m_y(0)
+        :m_sockfd(c_sockfd), m_position(make_pair(0,0))
 {
 }
 
@@ -174,9 +175,9 @@ void CRobot::extractCoords(const string & str)
             tmpVec.push_back(found);
         }
     }
-    m_x = tmpVec[0];
-    m_y = tmpVec[1];
+    m_position = make_pair(tmpVec[0], tmpVec[1]);
 }
+
 
 class CServer : public CMessenger
 {
@@ -295,7 +296,7 @@ void CServer::clientRoutine(int c_sockfd)
         return;
     }
 
-    while (1) {
+   /* while (1) {
 
         try {
             mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
@@ -318,7 +319,7 @@ void CServer::clientRoutine(int c_sockfd)
         }
 
         printf("sending %i bytes back to the client\n", mlen);
-    }
+    }*/
     close(c_sockfd);
 }
 
