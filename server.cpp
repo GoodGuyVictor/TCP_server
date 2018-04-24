@@ -133,7 +133,9 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 class CRobot : public CMessenger {
 private:
     int m_sockfd;
+    pair<int, int> m_prevPosition;
     pair<int, int> m_position;
+    EDirecton m_direction;
 public:
     CRobot(int c_sockfd);
     void move();
@@ -144,22 +146,29 @@ public:
 void CRobot::move()
 {
     cout << "Robot moves\n";
-    sendMessage(m_sockfd, SERVER_MOVE);
-    receiveMessage(m_sockfd, CLIENT_OK_LEN);
-    extractCoords(m_commands.front());
-    m_commands.pop();
-    print();
+    do {
+        sendMessage(m_sockfd, SERVER_MOVE);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        extractCoords(m_commands.front());
+        m_commands.pop();
+        print();
+    } while(m_position == m_prevPosition);
 }
 
 CRobot::CRobot(int c_sockfd)
-        :m_sockfd(c_sockfd), m_position(make_pair(0,0))
+        :m_sockfd(c_sockfd),
+         m_position(make_pair(INT32_MAX, INT32_MAX)),
+         m_prevPosition(make_pair(0,0))
 {
+//    move();
+//    int tmpX =
+//    move();
 }
 
 void CRobot::extractCoords(const string & str)
 {
     stringstream ss;
-    vector<int> tmpVec;
+    vector<int> tmpCoords;
 
     /* Storing the whole string into string stream */
     ss << str;
@@ -174,10 +183,11 @@ void CRobot::extractCoords(const string & str)
 
         /* Checking the given word is integer or not */
         if (stringstream(temp) >> found) {
-            tmpVec.push_back(found);
+            tmpCoords.push_back(found);
         }
     }
-    m_position = make_pair(tmpVec[0], tmpVec[1]);
+    m_prevPosition = m_position;
+    m_position = make_pair(tmpCoords[0], tmpCoords[1]);
 }
 
 
