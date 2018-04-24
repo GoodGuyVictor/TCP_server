@@ -46,7 +46,7 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
-enum EDirecton {up, right, down, left};
+enum EDirecton {Up, Right, Down, Left};
 
 class CMessenger
 {
@@ -205,11 +205,11 @@ void CRobot::determineDirection()
     int y = m_position.second - m_prevPosition.second;
 
     if(x != 0)
-        if(x < 0) m_direction = left;
-        else m_direction = right;
+        if(x < 0) m_direction = Left;
+        else m_direction = Right;
     else
-        if(y < 0) m_direction = down;
-        else m_direction = up;
+        if(y < 0) m_direction = Down;
+        else m_direction = Up;
 }
 
 void CRobot::checkIfReached()
