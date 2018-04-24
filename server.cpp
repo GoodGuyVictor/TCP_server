@@ -136,11 +136,13 @@ private:
     pair<int, int> m_prevPosition;
     pair<int, int> m_position;
     EDirecton m_direction;
+    bool m_reached;
 public:
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
     void determineDirection();
+    void checkIfReached();
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second); }
@@ -156,14 +158,18 @@ void CRobot::move()
         m_commands.pop();
         print();
     } while(m_position == m_prevPosition);
+    checkIfReached();
 }
 
 CRobot::CRobot(int c_sockfd)
         :m_sockfd(c_sockfd),
          m_position(make_pair(INT32_MAX, INT32_MAX)),
-         m_prevPosition(make_pair(0,0))
+         m_prevPosition(make_pair(0,0)),
+         m_reached(false)
 {
     move();
+//    if(m_reached)
+//        return;
     move();
     determineDirection();
 }
@@ -204,6 +210,14 @@ void CRobot::determineDirection()
     else
         if(y < 0) m_direction = down;
         else m_direction = up;
+}
+
+void CRobot::checkIfReached()
+{
+    int x = m_position.first;
+    int y = m_position.second;
+    if(x <= 2 && x >= -2 && y <= 2 && y >= -2)
+        m_reached = true;
 }
 
 
@@ -315,6 +329,7 @@ void CServer::clientRoutine(int c_sockfd)
 //
     try {
         CRobot robot(c_sockfd);
+
 
     }
     catch(CommunicationError e) {
