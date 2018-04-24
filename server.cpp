@@ -46,6 +46,8 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
+enum EDirecton {up, right, down, left};
+
 class CMessenger
 {
 protected:
