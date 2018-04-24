@@ -140,6 +140,7 @@ public:
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
+    void determineDirection();
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second); }
@@ -162,9 +163,9 @@ CRobot::CRobot(int c_sockfd)
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0))
 {
-//    move();
-//    int tmpX =
-//    move();
+    move();
+    move();
+    determineDirection();
 }
 
 void CRobot::extractCoords(const string & str)
@@ -190,6 +191,19 @@ void CRobot::extractCoords(const string & str)
     }
     m_prevPosition = m_position;
     m_position = make_pair(tmpCoords[0], tmpCoords[1]);
+}
+
+void CRobot::determineDirection()
+{
+    int x = m_position.first - m_prevPosition.first;
+    int y = m_position.second - m_prevPosition.second;
+
+    if(x != 0)
+        if(x < 0) m_direction = left;
+        else m_direction = right;
+    else
+        if(y < 0) m_direction = down;
+        else m_direction = up;
 }
 
 
@@ -298,11 +312,10 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    CRobot robot(c_sockfd);
 //
     try {
-        robot.move();
-        robot.move();
+        CRobot robot(c_sockfd);
+
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
