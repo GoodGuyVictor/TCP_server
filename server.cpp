@@ -46,7 +46,7 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
-enum EDirecton {Up, Right, Down, Left};
+enum EDirection {Up, Right, Down, Left};
 
 class CMessenger
 {
@@ -135,13 +135,15 @@ private:
     int m_sockfd;
     pair<int, int> m_prevPosition;
     pair<int, int> m_position;
-    EDirecton m_direction;
     bool m_reached;
+    pair<EDirection, EDirection> m_requiredDir;
 public:
+    EDirection m_direction;
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
-    void determineDirection();
+    void determineMyDirection();
+    void determineRequiredDirection();
     void checkIfReached();
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
                           m_position.first, m_position.second,
@@ -165,13 +167,18 @@ CRobot::CRobot(int c_sockfd)
         :m_sockfd(c_sockfd),
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0)),
-         m_reached(false)
+         m_reached(false),
+         m_requiredDir(0, 0)
 {
     move();
-//    if(m_reached)
-//        return;
+    if(m_reached)
+        return;
     move();
-    determineDirection();
+    if(m_reached)
+        return;
+    determineMyDirection();
+    determineRequiredDirection();
+
 }
 
 void CRobot::extractCoords(const string & str)
@@ -199,7 +206,7 @@ void CRobot::extractCoords(const string & str)
     m_position = make_pair(tmpCoords[0], tmpCoords[1]);
 }
 
-void CRobot::determineDirection()
+void CRobot::determineMyDirection()
 {
     int x = m_position.first - m_prevPosition.first;
     int y = m_position.second - m_prevPosition.second;
@@ -218,6 +225,18 @@ void CRobot::checkIfReached()
     int y = m_position.second;
     if(x <= 2 && x >= -2 && y <= 2 && y >= -2)
         m_reached = true;
+}
+
+void CRobot::determineRequiredDirection()
+{
+    int x = m_position.first;
+    int y = m_position.second;
+
+    if(x > 0) m_requiredDir.first = Left;
+    else m_requiredDir.first = Right;
+
+    if(y > 0) m_requiredDir.second = Down;
+    else m_requiredDir.second = Up;
 }
 
 
@@ -330,7 +349,7 @@ void CServer::clientRoutine(int c_sockfd)
     try {
         CRobot robot(c_sockfd);
 
-
+//        if(robot.m_direction == )
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
