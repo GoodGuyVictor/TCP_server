@@ -168,7 +168,7 @@ CRobot::CRobot(int c_sockfd)
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0)),
          m_reached(false),
-         m_requiredDir(0, 0)
+         m_requiredDir(Up, Up)
 {
     move();
     if(m_reached)
