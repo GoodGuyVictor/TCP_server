@@ -46,7 +46,7 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
-enum EDirection {Up, Right, Down, Left};
+enum EDirection {Up, Right, Down, Left, Default};
 
 class CMessenger
 {
@@ -133,18 +133,23 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 class CRobot : public CMessenger {
 private:
     int m_sockfd;
+    bool m_reached;
     pair<int, int> m_prevPosition;
     pair<int, int> m_position;
-    bool m_reached;
-    pair<EDirection, EDirection> m_requiredDir;
-public:
+    EDirection m_requiredDirHor;
+    EDirection m_requiredDirVert;
     EDirection m_direction;
+    EDirection m_tmpDir;
+public:
     CRobot(int c_sockfd);
     void move();
     void extractCoords(const string & str);
     void determineMyDirection();
     void determineRequiredDirection();
     void checkIfReached();
+    void turnLeft();
+    void turnRight();
+    void turnToProperDirection();
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second); }
@@ -168,7 +173,9 @@ CRobot::CRobot(int c_sockfd)
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0)),
          m_reached(false),
-         m_requiredDir(Up, Up)
+         m_direction(Default),
+         m_requiredDirHor(Default),
+         m_requiredDirVert(Default)
 {
     move();
     if(m_reached)
@@ -178,6 +185,9 @@ CRobot::CRobot(int c_sockfd)
         return;
     determineMyDirection();
     determineRequiredDirection();
+    turnToProperDirection();
+
+
 
 }
 
@@ -212,11 +222,11 @@ void CRobot::determineMyDirection()
     int y = m_position.second - m_prevPosition.second;
 
     if(x != 0)
-        if(x < 0) m_direction = Left;
-        else m_direction = Right;
+        if(x < 0) m_direction = Left;//left
+        else m_direction = Right;//right
     else
-        if(y < 0) m_direction = Down;
-        else m_direction = Up;
+        if(y < 0) m_direction = Down;//down
+        else m_direction = Up;//up
 }
 
 void CRobot::checkIfReached()
@@ -232,11 +242,74 @@ void CRobot::determineRequiredDirection()
     int x = m_position.first;
     int y = m_position.second;
 
-    if(x > 0) m_requiredDir.first = Left;
-    else m_requiredDir.first = Right;
+    if(x > 0) m_requiredDirHor = Left;
+    else m_requiredDirHor = Right;
 
-    if(y > 0) m_requiredDir.second = Down;
-    else m_requiredDir.second = Up;
+    if(y > 0) m_requiredDirVert = Down;
+    else m_requiredDirVert = Up;
+}
+
+void CRobot::turnLeft()
+{
+    if(m_direction == Up)
+        m_tmpDir = Left;
+
+    if(m_direction == Down)
+        m_tmpDir = Right;
+
+    if(m_direction == Right)
+        m_tmpDir = Up;
+
+    if(m_direction == Left)
+        m_tmpDir = Down;
+}
+
+void CRobot::turnRight()
+{
+    if(m_direction == Up)
+        m_tmpDir = Right;
+
+    if(m_direction == Down)
+        m_tmpDir = Left;
+
+    if(m_direction == Right)
+        m_tmpDir = Down;
+
+    if(m_direction == Left)
+        m_tmpDir = Up;
+}
+
+void CRobot::turnToProperDirection()
+{
+    m_tmpDir = m_direction;
+    if(m_tmpDir == m_requiredDirVert || m_tmpDir == m_requiredDirHor)
+        return;
+
+    turnLeft();
+    if(m_tmpDir == m_requiredDirHor || m_tmpDir == m_requiredDirVert)
+    {
+        m_direction = m_tmpDir;
+        sendMessage(m_sockfd, SERVER_TURN_LEFT);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+    } else {
+        m_tmpDir = m_direction;
+        turnRight();
+        if(m_tmpDir == m_requiredDirHor || m_tmpDir == m_requiredDirVert)
+        {
+            m_direction = m_tmpDir;
+            sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        }else {
+            turnRight();
+            turnRight();
+            m_direction = m_tmpDir;
+            sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        }
+    }
+
 }
 
 
