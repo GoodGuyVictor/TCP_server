@@ -34,7 +34,7 @@ using namespace std;
 
 #define CLIENT_USERNAME_LEN 12
 #define CLIENT_CONFIRMATION_LEN 7
-#define CLIENT_OK_LEN 99999
+#define CLIENT_OK_LEN 999
 #define CLIENT_RECHARGING_LEN 12
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
@@ -57,6 +57,7 @@ protected:
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, size_t expectedLen);
+    void validateMessage(const string & message, const size_t expLen) const;
 };
 
 queue<string> CMessenger::m_commands;
@@ -93,11 +94,14 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
         cout << "buffer: "<< m_buffer << endl;
 //        printf("buffer: %s\n", m_buffer);
 
+//        validateMessage(tmpContainer, expectedLen);
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
+//            if(tmpCommand.length() > expectedLen)
+//                throw
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
@@ -130,6 +134,16 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     return (int)m_commands.front().length();
 }
 
+void CMessenger::validateMessage(const string & message, const size_t expLen) const
+{
+    switch(expLen)
+    {
+        case CLIENT_USERNAME_LEN: {
+//            if()
+        }
+    }
+}
+
 class CRobot : public CMessenger {
 private:
     int m_sockfd;
@@ -150,9 +164,10 @@ public:
     void turnLeft();
     void turnRight();
     void turnToProperDirection();
-    void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\n",
+    void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\ndir: %d\nreached: %d\n",
                           m_position.first, m_position.second,
-                          m_prevPosition.first, m_prevPosition.second); }
+                          m_prevPosition.first, m_prevPosition.second,
+                          m_direction, m_reached); }
 };
 
 void CRobot::move()
@@ -163,9 +178,9 @@ void CRobot::move()
         receiveMessage(m_sockfd, CLIENT_OK_LEN);
         extractCoords(m_commands.front());
         m_commands.pop();
-        print();
     } while(m_position == m_prevPosition);
     checkIfReached();
+    print();
 }
 
 CRobot::CRobot(int c_sockfd)
@@ -186,7 +201,7 @@ CRobot::CRobot(int c_sockfd)
     determineMyDirection();
     determineRequiredDirection();
     turnToProperDirection();
-
+    print();
 
 
 }
@@ -239,18 +254,40 @@ void CRobot::checkIfReached()
 
 void CRobot::determineRequiredDirection()
 {
-    int x = m_position.first;
-    int y = m_position.second;
+    int x = 0 - m_position.first;
+    int y = 0 - m_position.second;
 
-    if(x > 0) m_requiredDirHor = Left;
-    else m_requiredDirHor = Right;
+    if(x < 0 && x < -2)
+        m_requiredDirHor = Left;
 
-    if(y > 0) m_requiredDirVert = Down;
-    else m_requiredDirVert = Up;
+    if(x > 0 && x > 2)
+        m_requiredDirHor = Right;
+
+    if(y < 0 && y < -2)
+        m_requiredDirVert = Down;
+
+    if(y > 0 && y > 2)
+        m_requiredDirVert = Up;
+
+
+//    if(y <= 2 && y >= -2) {
+//        if(x > 0) m_requiredDirHor = Left;
+//        else m_requiredDirHor = Right;
+//    } else {
+//        if(y > 0) m_requiredDirVert = Down;
+//        else m_requiredDirVert = Up;
+//
+//        if(x > 2 || x < -2) {
+//            if(x > 0) m_requiredDirHor = Left;
+//            else m_requiredDirHor = Right;
+//        }
+//    }
+
 }
 
 void CRobot::turnLeft()
 {
+    //todo
     if(m_direction == Up)
         m_tmpDir = Left;
 
@@ -281,6 +318,8 @@ void CRobot::turnRight()
 
 void CRobot::turnToProperDirection()
 {
+    cout << "ReqDirV: " << m_requiredDirVert << "\nReqDirH: " << m_requiredDirHor << endl;
+
     m_tmpDir = m_direction;
     if(m_tmpDir == m_requiredDirVert || m_tmpDir == m_requiredDirHor)
         return;
@@ -301,6 +340,7 @@ void CRobot::turnToProperDirection()
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
         }else {
             turnRight();
+            m_direction = m_tmpDir;
             turnRight();
             m_direction = m_tmpDir;
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
@@ -429,6 +469,8 @@ void CServer::clientRoutine(int c_sockfd)
         close(c_sockfd);
         return;
     }
+
+    cout << "The End" << endl;
 
    /* while (1) {
 
