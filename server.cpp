@@ -64,6 +64,7 @@ queue<string> CMessenger::m_commands;
 
 void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
+    cout << "Sending..." << endl;
     if(mlen == 0)
         mlen = strlen(message);
     if (send(c_sockfd, message, mlen, 0) == -1) {
@@ -204,7 +205,29 @@ CRobot::CRobot(int c_sockfd)
     turnToProperDirection();
     print();
 
-
+    switch(m_direction){
+        case Up: {
+            while(m_position.second < -2)
+                move();
+            break;
+        }
+        case Down: {
+            while(m_position.second > 2)
+                move();
+            break;
+        }
+        case Right: {
+            while(m_position.first < -2)
+                move();
+            break;
+        }
+        case Left: {
+            while(m_position.first > 2)
+                move();
+            break;
+        }
+    } cout << "End of switch" << endl;
+    print();
 }
 
 void CRobot::extractCoords(const string & str)
@@ -317,6 +340,7 @@ void CRobot::turnToProperDirection()
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_LEFT);
         receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        m_commands.pop();
     } else {
         m_tmpDir = m_direction;
         turnRight();
@@ -325,17 +349,19 @@ void CRobot::turnToProperDirection()
             m_direction = m_tmpDir;
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            m_commands.pop();
         }else {
             m_tmpDir = m_direction;
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
-            m_direction = m_tmpDir;
+            m_commands.pop();
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            m_commands.pop();
 
             m_direction = m_tmpDir;
         }
