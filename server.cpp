@@ -190,7 +190,8 @@ CRobot::CRobot(int c_sockfd)
          m_reached(false),
          m_direction(Default),
          m_requiredDirHor(Default),
-         m_requiredDirVert(Default)
+         m_requiredDirVert(Default),
+         m_tmpDir(Default)
 {
     move();
     if(m_reached)
@@ -242,6 +243,8 @@ void CRobot::determineMyDirection()
     else
         if(y < 0) m_direction = Down;//down
         else m_direction = Up;//up
+
+    cout << "My direction is " << m_direction << endl;
 }
 
 void CRobot::checkIfReached()
@@ -268,52 +271,36 @@ void CRobot::determineRequiredDirection()
 
     if(y > 0 && y > 2)
         m_requiredDirVert = Up;
-
-
-//    if(y <= 2 && y >= -2) {
-//        if(x > 0) m_requiredDirHor = Left;
-//        else m_requiredDirHor = Right;
-//    } else {
-//        if(y > 0) m_requiredDirVert = Down;
-//        else m_requiredDirVert = Up;
-//
-//        if(x > 2 || x < -2) {
-//            if(x > 0) m_requiredDirHor = Left;
-//            else m_requiredDirHor = Right;
-//        }
-//    }
-
 }
 
 void CRobot::turnLeft()
 {
-    //todo
-    if(m_direction == Up)
-        m_tmpDir = Left;
+    cout << "tmpDir before: " << m_tmpDir << endl;
 
-    if(m_direction == Down)
-        m_tmpDir = Right;
+//    m_tmpDir = m_direction;
+    switch(m_tmpDir) {
+        case Up: { m_tmpDir = Left; break; }
+        case Down: { m_tmpDir = Right; break; }
+        case Right: { m_tmpDir = Up; break; }
+        case Left: { m_tmpDir = Down; break; }
+    }
 
-    if(m_direction == Right)
-        m_tmpDir = Up;
-
-    if(m_direction == Left)
-        m_tmpDir = Down;
+    cout << "tmpDir after: " << m_tmpDir << endl;
 }
 
 void CRobot::turnRight()
 {
-    if(m_direction == Up)
-        m_tmpDir = Right;
+    cout << "tmpDir before: " << m_tmpDir << endl;
 
-    if(m_direction == Down)
-        m_tmpDir = Left;
+//    m_tmpDir = m_direction;
+    switch(m_tmpDir) {
+        case Up: { m_tmpDir = Right; break; }
+        case Down: { m_tmpDir = Left; break; }
+        case Right: { m_tmpDir = Down; break; }
+        case Left: { m_tmpDir = Up; break; }
+    }
 
-    if(m_direction == Right)
-        m_tmpDir = Down;
-
-    if(m_direction == Left)
-        m_tmpDir = Up;
+    cout << "tmpDir after: " << m_tmpDir << endl;
 }
 
 void CRobot::turnToProperDirection()
@@ -339,14 +326,18 @@ void CRobot::turnToProperDirection()
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
         }else {
+            m_tmpDir = m_direction;
+
             turnRight();
-            m_direction = m_tmpDir;
-            turnRight();
-            m_direction = m_tmpDir;
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            m_direction = m_tmpDir;
+
+            turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
             receiveMessage(m_sockfd, CLIENT_OK_LEN);
+
+            m_direction = m_tmpDir;
         }
     }
 
