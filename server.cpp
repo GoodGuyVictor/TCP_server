@@ -137,12 +137,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
 
 void CMessenger::validateMessage(const string & message, const size_t expLen) const
 {
-    switch(expLen)
-    {
-        case CLIENT_USERNAME_LEN: {
-//            if()
-        }
-    }
+
 }
 
 class CRobot : public CMessenger {
@@ -155,8 +150,7 @@ private:
     EDirection m_requiredDirVert;
     EDirection m_direction;
     EDirection m_tmpDir;
-public:
-    CRobot(int c_sockfd);
+
     void move();
     void extractCoords(const string & str);
     void determineMyDirection();
@@ -170,6 +164,9 @@ public:
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second,
                           m_direction, m_reached); }
+public:
+    CRobot(int c_sockfd);
+
 };
 
 void CRobot::move()
