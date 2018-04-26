@@ -165,6 +165,7 @@ public:
     void turnLeft();
     void turnRight();
     void turnToProperDirection();
+    void changeDirection();
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\ndir: %d\nreached: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second,
@@ -195,8 +196,6 @@ CRobot::CRobot(int c_sockfd)
          m_tmpDir(Default)
 {
     move();
-    if(m_reached)
-        return;
     move();
     if(m_reached)
         return;
@@ -227,7 +226,17 @@ CRobot::CRobot(int c_sockfd)
             break;
         }
     } cout << "End of switch" << endl;
+
+
+    if(!m_reached) {
+        changeDirection();
+
+        while(!m_reached)
+            move();
+    }
+
     print();
+    cout << "Reached bro!" << endl;
 }
 
 void CRobot::extractCoords(const string & str)
@@ -367,6 +376,26 @@ void CRobot::turnToProperDirection()
         }
     }
 
+}
+
+void CRobot::changeDirection()
+{
+    m_tmpDir = m_direction;
+    turnLeft();
+    if(m_tmpDir == m_requiredDirVert || m_tmpDir == m_requiredDirHor)
+    {
+        m_direction = m_tmpDir;
+        sendMessage(m_sockfd, SERVER_TURN_LEFT);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        m_commands.pop();
+    }else {
+        m_tmpDir = m_direction;
+        turnRight();
+        m_direction = m_tmpDir;
+        sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        m_commands.pop();
+    }
 }
 
 
