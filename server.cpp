@@ -41,6 +41,9 @@ using namespace std;
 
 #define POSTFIX "\a\b"
 
+#define TIMEOUT 1
+#define TIMEOUT_RECHARGING 5
+
 
 class CommunicationError{};
 class SyntaxError{};
@@ -83,7 +86,7 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     size_t foundPos;
     bool foundBool = false;
 
-    if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+    if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
     {
         perror("read error");
         throw CommunicationError();
@@ -115,10 +118,10 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
                 throw SyntaxError();
             }
 
-            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-                perror("write error");
-                throw CommunicationError();
-            }
+//            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
+//                perror("write error");
+//                throw CommunicationError();
+//            }
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
@@ -471,7 +474,8 @@ void CServer::run()
 
 void CServer::clientRoutine(int c_sockfd)
 {
-    int mlen;
+    timeval timer{TIMEOUT, 0};
+    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
 
     try {
         authenticate(c_sockfd);
@@ -496,16 +500,11 @@ void CServer::clientRoutine(int c_sockfd)
         return;
     }
 
-
-    //robot creation here
-
     cout << "Authentication was successful\n";
 
-//
     try {
         CRobot robot(c_sockfd);
 
-//        if(robot.m_direction == )
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
@@ -515,30 +514,6 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "The End" << endl;
 
-   /* while (1) {
-
-        try {
-            mlen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
-        }
-        catch (CommunicationError e) {
-            break;
-        }
-
-
-        if(mlen == 0)
-            break;
-
-        printf("Client #%d: %s\n", c_sockfd, m_buffer);
-
-        try {
-            sendMessage(c_sockfd, m_buffer, mlen);
-        }
-        catch (CommunicationError e) {
-            break;
-        }
-
-        printf("sending %i bytes back to the client\n", mlen);
-    }*/
     close(c_sockfd);
 }
 
