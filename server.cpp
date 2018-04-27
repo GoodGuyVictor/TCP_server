@@ -54,17 +54,19 @@ enum EMessageType
 
 class CMessenger
 {
+public:
+    CMessenger() = default;
+    CMessenger(const queue<string> & src) : m_commands(src) {}
 protected:
     char m_buffer[1000];
     const size_t BUFFSIZE = 1000;
-    static queue<string> m_commands;
+    queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, EMessageType type);
     bool isValid(const string &message, EMessageType type) const;
 };
 
-queue<string> CMessenger::m_commands;
 
 void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
@@ -208,7 +210,7 @@ private:
                           m_prevPosition.first, m_prevPosition.second,
                           m_direction, m_reached); }
 public:
-    CRobot(int c_sockfd);
+    CRobot(int c_sockfd, const queue<string> & src);
 
 };
 
@@ -225,8 +227,9 @@ void CRobot::move()
     print();
 }
 
-CRobot::CRobot(int c_sockfd)
+CRobot::CRobot(int c_sockfd, const queue<string> & src)
         :m_sockfd(c_sockfd),
+         CMessenger(src),
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0)),
          m_reached(false),
@@ -542,7 +545,7 @@ void CServer::clientRoutine(int c_sockfd)
     cout << "Authentication was successful\n";
 
     try {
-        CRobot robot(c_sockfd);
+        CRobot robot(c_sockfd, m_commands);
 
     }
     catch(CommunicationError e) {
