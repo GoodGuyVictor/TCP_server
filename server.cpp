@@ -39,6 +39,7 @@ using namespace std;
 class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
+class LogicError{};
 
 enum EDirection { Default, Up, Right, Down, Left };
 enum EMessageType
@@ -66,7 +67,8 @@ protected:
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, EMessageType type);
-    bool isValid(const string &message, EMessageType type) const;
+    bool isValid(string &message, EMessageType type, int c_sockfd);
+    string rechargingHandler(const int c_sockfd, EMessageType type);
 };
 
 
@@ -85,7 +87,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
     if(!m_commands.empty())
     {
-        if(isValid(m_commands.front(), type))
+        if(isValid(m_commands.front(), type, c_sockfd))
             return (int)m_commands.front().length();
         else
             throw SyntaxError();
@@ -111,7 +113,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
         if (foundPos != string::npos) {
             string tmpCommand(tmpContainer, 0, foundPos);
 
-            if(!isValid(tmpCommand, type))
+            if(!isValid(tmpCommand, type, c_sockfd))
                 throw SyntaxError();
             else
                 type = Client_default;
@@ -125,7 +127,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 
             cout << "not found" << endl;
 
-            if(!isValid(tmpContainer, type))
+            if(!isValid(tmpContainer, type, c_sockfd))
                 throw SyntaxError();
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
@@ -143,43 +145,69 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     return (int)m_commands.front().length();
 }
 
-bool CMessenger::isValid(const string &message, EMessageType type) const
+bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
 {
     switch(type)
     {
         case Client_username:
         {
-//            if(message.length() <= 10)
-//                cout << "Name len is less than or equal to 10" << endl;
-//            else cout << "No" << endl;
-//            cout << message.length() << endl;
             return message.size() <= CLIENT_USERNAME_LEN - 2;
         }
         case Client_confirmation:
         {
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_confirmation);
+
             cout << "Code validation" << endl;
             regex confirmation("^[0-9]{1,5}$");
             return regex_match(message, confirmation);
         }
-        case Client_ok: { return true; }
-        case Client_recharging:
+        case Client_ok:
         {
-            if(message.length() < CLIENT_RECHARGING_LEN)
-                return true;
-            string recharging("RECHARGING");
-            return message == recharging;
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_ok);
+
+            return true;
         }
         case Client_full_power:
         {
-            string full_power("FULL POWER");
-            return message == full_power;
+            if(message != "FULL POWER") {
+                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
+                    return true;
+
+                if(message.length() == CLIENT_FULL_POWER_LEN - 2)
+                    throw LogicError();
+
+                if(message.length() > CLIENT_FULL_POWER_LEN - 2)
+                    throw SyntaxError();
+            }
+            return true;
         }
         case Client_message:
         {
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_message);
+
             return message.length() <= CLIENT_MESSAGE_LEN - 2;
         }
         default: return true;
     }
+}
+
+string CMessenger::rechargingHandler(const int c_sockfd, EMessageType type)
+{
+    timeval timer{TIMEOUT_RECHARGING, 0};
+    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+
+    receiveMessage(c_sockfd, Client_full_power);
+    //fetch FULL POWER message
+    m_commands.pop();
+    receiveMessage(c_sockfd, type);
+
+    string nextMessage(m_commands.front()); //segfault possibility
+    m_commands.pop();
+
+    return nextMessage;
 }
 
 
