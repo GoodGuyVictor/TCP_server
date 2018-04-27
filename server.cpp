@@ -8,6 +8,7 @@
 #include <vector>
 #include <queue>
 #include <sstream>
+#include <regex>
 
 using namespace std;
 
@@ -22,19 +23,9 @@ using namespace std;
 #define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\a\b"
 #define SERVER_LOGIC_ERROR "302 LOGIC ERROR\a\b"
 
-//#define SERVER_MOVE_LEN 10
-//#define SERVER_TURN_LEFT_LEN 17
-//#define SERVER_TURN_RIGHT_LEN 18
-//#define SERVER_PICK_UP_LEN 19
-//#define SERVER_LOGOUT_LEN 15
-//#define SERVER_OK_LEN 8
-//#define SERVER_LOGIN_FAILED_LEN 20
-//#define SERVER_SYNTAX_ERROR_LEN 20
-//#define SERVER_LOGIC_ERROR_LEN 19
-
 #define CLIENT_USERNAME_LEN 12
 #define CLIENT_CONFIRMATION_LEN 7
-#define CLIENT_OK_LEN 999
+#define CLIENT_OK_LEN 12
 #define CLIENT_RECHARGING_LEN 12
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
@@ -49,18 +40,28 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
-enum EDirection {Default, Up, Right, Down, Left};
+enum EDirection { Default, Up, Right, Down, Left };
+enum EMessageType
+{
+    Client_default,
+    Client_username,
+    Client_confirmation,
+    Client_ok,
+    Client_recharging,
+    Client_full_power,
+    Client_message
+};
 
 class CMessenger
 {
 protected:
     char m_buffer[1000];
-    const int BUFFSIZE = 1000;
+    const size_t BUFFSIZE = 1000;
     static queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
-    int receiveMessage(int c_sockfd, size_t expectedLen);
-    void validateMessage(const string & message, const size_t expLen) const;
+    int receiveMessage(int c_sockfd, EMessageType type);
+    bool isValid(const string &message, EMessageType type) const;
 };
 
 queue<string> CMessenger::m_commands;
@@ -76,7 +77,7 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
     }
 }
 
-int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
+int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
     if(!m_commands.empty())
         return (int)m_commands.front().length();
@@ -95,17 +96,19 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
-        cout << "buffer: "<< m_buffer << endl;
-//        printf("buffer: %s\n", m_buffer);
+        cout << "buffer: "<< tmpContainer << endl;
 
-//        validateMessage(tmpContainer, expectedLen);
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
-//            if(tmpCommand.length() > expectedLen)
-//                throw
+
+            if(!isValid(tmpCommand, type))
+                throw SyntaxError();
+            else
+                type = Client_default;
+
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
@@ -114,9 +117,11 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
         } else {
 
             cout << "not found" << endl;
-            if (!foundBool && tmpContainer.size() > expectedLen){
+//            if (!foundBool && tmpContainer.size() > expectedLen){
+//                throw SyntaxError();
+//            }
+            if(!isValid(tmpContainer, type))
                 throw SyntaxError();
-            }
 
 //            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
 //                perror("write error");
@@ -138,10 +143,45 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     return (int)m_commands.front().length();
 }
 
-void CMessenger::validateMessage(const string & message, const size_t expLen) const
+bool CMessenger::isValid(const string &message, EMessageType type) const
 {
-
+    switch(type)
+    {
+        case Client_username:
+        {
+//            if(message.length() <= 10)
+//                cout << "Name len is less than or equal to 10" << endl;
+//            else cout << "No" << endl;
+//            cout << message.length() << endl;
+            return message.size() <= CLIENT_USERNAME_LEN - 2;
+        }
+        case Client_confirmation:
+        {
+            cout << "Code validation" << endl;
+            regex confirmation("^[0-9]{1,5}$");
+            return regex_match(message, confirmation);
+        }
+        case Client_ok: { return true; }
+        case Client_recharging:
+        {
+            if(message.length() < CLIENT_RECHARGING_LEN)
+                return true;
+            string recharging("RECHARGING");
+            return message == recharging;
+        }
+        case Client_full_power:
+        {
+            string full_power("FULL POWER");
+            return message == full_power;
+        }
+        case Client_message:
+        {
+            return message.length() <= CLIENT_MESSAGE_LEN - 2;
+        }
+        default: return true;
+    }
 }
+
 
 class CRobot : public CMessenger {
 private:
@@ -177,7 +217,7 @@ void CRobot::move()
     cout << "Robot moves\n";
     do {
         sendMessage(m_sockfd, SERVER_MOVE);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         extractCoords(m_commands.front());
         m_commands.pop();
     } while(m_position == m_prevPosition);
@@ -348,7 +388,7 @@ void CRobot::turnToProperDirection()
     {
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_LEFT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     } else {
         m_tmpDir = m_direction;
@@ -357,19 +397,19 @@ void CRobot::turnToProperDirection()
         {
             m_direction = m_tmpDir;
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
         }else {
             m_tmpDir = m_direction;
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
 
             m_direction = m_tmpDir;
@@ -386,14 +426,14 @@ void CRobot::changeDirection()
     {
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_LEFT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     }else {
         m_tmpDir = m_direction;
         turnRight();
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     }
 }
@@ -489,7 +529,6 @@ void CServer::clientRoutine(int c_sockfd)
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
-        sendMessage(c_sockfd, SERVER_LOGIN_FAILED);
         close(c_sockfd);
         return;
     }
@@ -523,7 +562,7 @@ void CServer::authenticate(int c_sockfd)
 
     cout << "Waiting for username...\n";
     //getting username
-    messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
+    messLen = receiveMessage(c_sockfd, Client_username);
 
     unsigned short hash = makeHash();
     cout << "hash: " << hash << endl;
@@ -538,7 +577,7 @@ void CServer::authenticate(int c_sockfd)
     cout << "expecting code: " << expected << endl;
 
     //getting client's code
-    messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
+    messLen = receiveMessage(c_sockfd, Client_confirmation);
 
     string response(m_commands.front());
     m_commands.pop();
