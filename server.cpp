@@ -58,6 +58,8 @@ public:
     CMessenger() = default;
     CMessenger(const queue<string> & src) : m_commands(src) {}
 protected:
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
     char m_buffer[1000];
     const size_t BUFFSIZE = 1000;
     queue<string> m_commands;
@@ -178,81 +180,6 @@ bool CMessenger::isValid(const string &message, EMessageType type) const
 }
 
 
-class CClient : public CMessenger
-{
-private:
-    const unsigned short CLIENT_KEY = 45328;
-    const unsigned short SERVER_KEY = 54621;
-    int m_sockfd;
-public:
-    CClient(int sockfd) : m_sockfd(sockfd)
-    {
-        timeval timer{TIMEOUT, 0};
-        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
-    };
-    void authenticate();
-    unsigned short makeHash();
-    int putCodeIntoBuffer(const unsigned short code);
-    const queue<string> & getCommands() const { return m_commands; }
-};
-
-void CClient::authenticate()
-{
-    int messLen;
-
-    cout << "Waiting for username...\n";
-    //getting username
-    messLen = receiveMessage(m_sockfd, Client_username);
-
-    unsigned short hash = makeHash();
-    cout << "hash: " << hash << endl;
-    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
-    cout << "confirmation code: " << confirmationCode << endl;
-    int codeLen = putCodeIntoBuffer(confirmationCode);
-
-    //sending code to the client
-    sendMessage(m_sockfd, m_buffer, codeLen);
-
-    unsigned short expected = (hash + CLIENT_KEY) % 65536;
-    cout << "expecting code: " << expected << endl;
-
-    //getting client's code
-    messLen = receiveMessage(m_sockfd, Client_confirmation);
-
-    string response(m_commands.front());
-    m_commands.pop();
-
-    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
-    cout << "client confirmation code: " << clientConfirmationCode << endl;
-
-    if(expected != clientConfirmationCode) {
-        throw LoginError();
-    }
-}
-
-unsigned short CClient::makeHash()
-{
-    unsigned short hash = 0;
-    string username(m_commands.front());
-    m_commands.pop();
-    for(int i = 0; i < username.length(); i++) {
-        hash += username[i];
-    }
-    hash = (hash * 1000) % 65536;
-    return hash;
-}
-
-int CClient::putCodeIntoBuffer(const unsigned short code)
-{
-    string tmpStr = to_string(code);
-    tmpStr += POSTFIX;
-    for (int i = 0; i < tmpStr.length(); ++i) {
-        m_buffer[i] = tmpStr[i];
-    }
-
-    return (int)tmpStr.length();
-}
-
 class CRobot : public CMessenger
 {
 private:
@@ -274,14 +201,79 @@ private:
     void turnRight();
     void turnToProperDirection();
     void changeDirection();
+    void authenticate();
+    unsigned short makeHash();
+    int putCodeIntoBuffer(const unsigned short);
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\ndir: %d\nreached: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second,
                           m_direction, m_reached); }
 public:
-    CRobot(int c_sockfd, const queue<string> & src);
+    CRobot(int c_sockfd);
 
 };
+
+CRobot::CRobot(int c_sockfd)
+        :m_sockfd(c_sockfd),
+         m_position(make_pair(INT32_MAX, INT32_MAX)),
+         m_prevPosition(make_pair(0,0)),
+         m_reached(false),
+         m_direction(Default),
+         m_requiredDirHor(Default),
+         m_requiredDirVert(Default),
+         m_tmpDir(Default)
+{
+    timeval timer{TIMEOUT, 0};
+    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+
+    authenticate();
+    sendMessage(c_sockfd, SERVER_OK);
+
+    cout << "Authentication succeed" << endl;
+
+    move();
+    move();
+    if(m_reached)
+        return;
+    determineMyDirection();
+    determineRequiredDirection();
+    turnToProperDirection();
+    print();
+
+//    switch(m_direction){
+//        case Up: {
+//            while(m_position.second < -2)
+//                move();
+//            break;
+//        }
+//        case Down: {
+//            while(m_position.second > 2)
+//                move();
+//            break;
+//        }
+//        case Right: {
+//            while(m_position.first < -2)
+//                move();
+//            break;
+//        }
+//        case Left: {
+//            while(m_position.first > 2)
+//                move();
+//            break;
+//        }
+//    } cout << "End of switch" << endl;
+//
+//
+//    if(!m_reached) {
+//        changeDirection();
+//
+//        while(!m_reached)
+//            move();
+//    }
+//
+//    print();
+//    cout << "Reached bro!" << endl;
+}
 
 void CRobot::move()
 {
@@ -294,61 +286,6 @@ void CRobot::move()
     } while(m_position == m_prevPosition);
     checkIfReached();
     print();
-}
-
-CRobot::CRobot(int c_sockfd, const queue<string> & src)
-        :m_sockfd(c_sockfd),
-         CMessenger(src),
-         m_position(make_pair(INT32_MAX, INT32_MAX)),
-         m_prevPosition(make_pair(0,0)),
-         m_reached(false),
-         m_direction(Default),
-         m_requiredDirHor(Default),
-         m_requiredDirVert(Default),
-         m_tmpDir(Default)
-{
-    move();
-    move();
-    if(m_reached)
-        return;
-    determineMyDirection();
-    determineRequiredDirection();
-    turnToProperDirection();
-    print();
-
-    switch(m_direction){
-        case Up: {
-            while(m_position.second < -2)
-                move();
-            break;
-        }
-        case Down: {
-            while(m_position.second > 2)
-                move();
-            break;
-        }
-        case Right: {
-            while(m_position.first < -2)
-                move();
-            break;
-        }
-        case Left: {
-            while(m_position.first > 2)
-                move();
-            break;
-        }
-    } cout << "End of switch" << endl;
-
-
-    if(!m_reached) {
-        changeDirection();
-
-        while(!m_reached)
-            move();
-    }
-
-    print();
-    cout << "Reached bro!" << endl;
 }
 
 void CRobot::extractCoords(const string & str)
@@ -510,6 +447,63 @@ void CRobot::changeDirection()
     }
 }
 
+void CRobot::authenticate()
+{
+    int messLen;
+
+    cout << "Waiting for username...\n";
+    //getting username
+    messLen = receiveMessage(m_sockfd, Client_username);
+
+    unsigned short hash = makeHash();
+    cout << "hash: " << hash << endl;
+    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
+    cout << "confirmation code: " << confirmationCode << endl;
+    int codeLen = putCodeIntoBuffer(confirmationCode);
+
+    //sending code to the client
+    sendMessage(m_sockfd, m_buffer, codeLen);
+
+    unsigned short expected = (hash + CLIENT_KEY) % 65536;
+    cout << "expecting code: " << expected << endl;
+
+    //getting client's code
+    messLen = receiveMessage(m_sockfd, Client_confirmation);
+
+    string response(m_commands.front());
+    m_commands.pop();
+
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
+    cout << "client confirmation code: " << clientConfirmationCode << endl;
+
+    if(expected != clientConfirmationCode) {
+        throw LoginError();
+    }
+}
+
+unsigned short CRobot::makeHash()
+{
+    unsigned short hash = 0;
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
+    }
+    hash = (hash * 1000) % 65536;
+    return hash;
+}
+
+int CRobot::putCodeIntoBuffer(const unsigned short code)
+{
+    string tmpStr = to_string(code);
+    tmpStr += POSTFIX;
+    for (int i = 0; i < tmpStr.length(); ++i) {
+        m_buffer[i] = tmpStr[i];
+    }
+
+    return (int)tmpStr.length();
+}
+
 
 class CServer : public CMessenger
 {
@@ -583,11 +577,9 @@ void CServer::run()
 
 void CServer::clientRoutine(int c_sockfd)
 {
-    CClient client(c_sockfd);
 
     try {
-        client.authenticate();
-        sendMessage(c_sockfd, SERVER_OK);
+        CRobot robot(c_sockfd);
     }
     catch (SyntaxError e) {
         cout << "Syntax error\n";
@@ -610,15 +602,7 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    try {
-        CRobot robot(c_sockfd, client.getCommands());
 
-    }
-    catch(CommunicationError e) {
-        cout << "Communication error\n";
-        close(c_sockfd);
-        return;
-    }
 
     cout << "The End" << endl;
 
