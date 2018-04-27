@@ -133,6 +133,9 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
                 throw CommunicationError();
             }
 
+            if (mlen == 0)
+                throw CommunicationError();
+
             tmpContainer.append(m_buffer, mlen);
         }
     }
