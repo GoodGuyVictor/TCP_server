@@ -185,7 +185,83 @@ bool CMessenger::isValid(const string &message, EMessageType type) const
 }
 
 
-class CRobot : public CMessenger {
+class CClient : public CMessenger
+{
+private:
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
+    int m_sockfd;
+public:
+    CClient(int sockfd) : m_sockfd(sockfd)
+    {
+        timeval timer{TIMEOUT, 0};
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+    };
+    void authenticate();
+    unsigned short makeHash();
+    int putCodeIntoBuffer(const unsigned short code);
+    const queue<string> & getCommands() const { return m_commands; }
+};
+
+void CClient::authenticate()
+{
+    int messLen;
+
+    cout << "Waiting for username...\n";
+    //getting username
+    messLen = receiveMessage(m_sockfd, Client_username);
+
+    unsigned short hash = makeHash();
+    cout << "hash: " << hash << endl;
+    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
+    cout << "confirmation code: " << confirmationCode << endl;
+    int codeLen = putCodeIntoBuffer(confirmationCode);
+
+    //sending code to the client
+    sendMessage(m_sockfd, m_buffer, codeLen);
+
+    unsigned short expected = (hash + CLIENT_KEY) % 65536;
+    cout << "expecting code: " << expected << endl;
+
+    //getting client's code
+    messLen = receiveMessage(m_sockfd, Client_confirmation);
+
+    string response(m_commands.front());
+    m_commands.pop();
+
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
+    cout << "client confirmation code: " << clientConfirmationCode << endl;
+
+    if(expected != clientConfirmationCode) {
+        throw LoginError();
+    }
+}
+
+unsigned short CClient::makeHash()
+{
+    unsigned short hash = 0;
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
+    }
+    hash = (hash * 1000) % 65536;
+    return hash;
+}
+
+int CClient::putCodeIntoBuffer(const unsigned short code)
+{
+    string tmpStr = to_string(code);
+    tmpStr += POSTFIX;
+    for (int i = 0; i < tmpStr.length(); ++i) {
+        m_buffer[i] = tmpStr[i];
+    }
+
+    return (int)tmpStr.length();
+}
+
+class CRobot : public CMessenger
+{
 private:
     int m_sockfd;
     bool m_reached;
@@ -467,9 +543,6 @@ private:
     void setUpSocket();
     void run();
     void clientRoutine(int c_sockfd);
-    void authenticate(int c_sockfd);
-    unsigned short makeHash();
-    int putCodeIntoBuffer(unsigned short code);
 };
 
 void CServer::setUpSocket()
@@ -517,11 +590,10 @@ void CServer::run()
 
 void CServer::clientRoutine(int c_sockfd)
 {
-    timeval timer{TIMEOUT, 0};
-    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+    CClient client(c_sockfd);
 
     try {
-        authenticate(c_sockfd);
+        client.authenticate();
         sendMessage(c_sockfd, SERVER_OK);
     }
     catch (SyntaxError e) {
@@ -542,10 +614,11 @@ void CServer::clientRoutine(int c_sockfd)
         return;
     }
 
+
     cout << "Authentication was successful\n";
 
     try {
-        CRobot robot(c_sockfd, m_commands);
+        CRobot robot(c_sockfd, client.getCommands());
 
     }
     catch(CommunicationError e) {
@@ -557,64 +630,6 @@ void CServer::clientRoutine(int c_sockfd)
     cout << "The End" << endl;
 
     close(c_sockfd);
-}
-
-void CServer::authenticate(int c_sockfd)
-{
-    int messLen;
-
-    cout << "Waiting for username...\n";
-    //getting username
-    messLen = receiveMessage(c_sockfd, Client_username);
-
-    unsigned short hash = makeHash();
-    cout << "hash: " << hash << endl;
-    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
-    cout << "confirmation code: " << confirmationCode << endl;
-    int codeLen = putCodeIntoBuffer(confirmationCode);
-
-    //sending code to the client
-    sendMessage(c_sockfd, m_buffer, codeLen);
-
-    unsigned short expected = (hash + CLIENT_KEY) % 65536;
-    cout << "expecting code: " << expected << endl;
-
-    //getting client's code
-    messLen = receiveMessage(c_sockfd, Client_confirmation);
-
-    string response(m_commands.front());
-    m_commands.pop();
-
-    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
-    cout << "client confirmation code: " << clientConfirmationCode << endl;
-
-    if(expected != clientConfirmationCode) {
-        throw LoginError();
-    }
-}
-
-unsigned short CServer::makeHash()
-{
-    unsigned short hash = 0;
-    string username(m_commands.front());
-    m_commands.pop();
-    for(int i = 0; i < username.length(); i++) {
-        hash += username[i];
-    }
-    hash = (hash * 1000) % 65536;
-    return hash;
-}
-
-int CServer::putCodeIntoBuffer(unsigned short code)
-{
-
-    string tmpStr = to_string(code);
-    tmpStr += POSTFIX;
-    for (int i = 0; i < tmpStr.length(); ++i) {
-        m_buffer[i] = tmpStr[i];
-    }
-
-    return (int)tmpStr.length();
 }
 
 
