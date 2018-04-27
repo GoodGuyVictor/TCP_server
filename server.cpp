@@ -8,6 +8,7 @@
 #include <vector>
 #include <queue>
 #include <sstream>
+#include <regex>
 
 using namespace std;
 
@@ -22,19 +23,9 @@ using namespace std;
 #define SERVER_SYNTAX_ERROR "301 SYNTAX ERROR\a\b"
 #define SERVER_LOGIC_ERROR "302 LOGIC ERROR\a\b"
 
-//#define SERVER_MOVE_LEN 10
-//#define SERVER_TURN_LEFT_LEN 17
-//#define SERVER_TURN_RIGHT_LEN 18
-//#define SERVER_PICK_UP_LEN 19
-//#define SERVER_LOGOUT_LEN 15
-//#define SERVER_OK_LEN 8
-//#define SERVER_LOGIN_FAILED_LEN 20
-//#define SERVER_SYNTAX_ERROR_LEN 20
-//#define SERVER_LOGIC_ERROR_LEN 19
-
 #define CLIENT_USERNAME_LEN 12
 #define CLIENT_CONFIRMATION_LEN 7
-#define CLIENT_OK_LEN 999
+#define CLIENT_OK_LEN 12
 #define CLIENT_RECHARGING_LEN 12
 #define CLIENT_FULL_POWER_LEN 12
 #define CLIENT_MESSAGE_LEN 100
@@ -49,21 +40,33 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 
-enum EDirection {Default, Up, Right, Down, Left};
+enum EDirection { Default, Up, Right, Down, Left };
+enum EMessageType
+{
+    Client_default,
+    Client_username,
+    Client_confirmation,
+    Client_ok,
+    Client_recharging,
+    Client_full_power,
+    Client_message
+};
 
 class CMessenger
 {
+public:
+    CMessenger() = default;
+    CMessenger(const queue<string> & src) : m_commands(src) {}
 protected:
     char m_buffer[1000];
-    const int BUFFSIZE = 1000;
-    static queue<string> m_commands;
+    const size_t BUFFSIZE = 1000;
+    queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
-    int receiveMessage(int c_sockfd, size_t expectedLen);
-    void validateMessage(const string & message, const size_t expLen) const;
+    int receiveMessage(int c_sockfd, EMessageType type);
+    bool isValid(const string &message, EMessageType type) const;
 };
 
-queue<string> CMessenger::m_commands;
 
 void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) const
 {
@@ -76,10 +79,15 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
     }
 }
 
-int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
+int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
     if(!m_commands.empty())
-        return (int)m_commands.front().length();
+    {
+        if(isValid(m_commands.front(), type))
+            return (int)m_commands.front().length();
+        else
+            throw SyntaxError();
+    }
 
     int mlen = 0;
     string tmpContainer;
@@ -95,17 +103,19 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
-        cout << "buffer: "<< m_buffer << endl;
-//        printf("buffer: %s\n", m_buffer);
+        cout << "buffer: "<< tmpContainer << endl;
 
-//        validateMessage(tmpContainer, expectedLen);
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
             foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
-//            if(tmpCommand.length() > expectedLen)
-//                throw
+
+            if(!isValid(tmpCommand, type))
+                throw SyntaxError();
+            else
+                type = Client_default;
+
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
@@ -114,9 +124,11 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
         } else {
 
             cout << "not found" << endl;
-            if (!foundBool && tmpContainer.size() > expectedLen){
+//            if (!foundBool && tmpContainer.size() > expectedLen){
+//                throw SyntaxError();
+//            }
+            if(!isValid(tmpContainer, type))
                 throw SyntaxError();
-            }
 
 //            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
 //                perror("write error");
@@ -138,12 +150,123 @@ int CMessenger::receiveMessage(int c_sockfd, size_t expectedLen)
     return (int)m_commands.front().length();
 }
 
-void CMessenger::validateMessage(const string & message, const size_t expLen) const
+bool CMessenger::isValid(const string &message, EMessageType type) const
 {
-
+    switch(type)
+    {
+        case Client_username:
+        {
+//            if(message.length() <= 10)
+//                cout << "Name len is less than or equal to 10" << endl;
+//            else cout << "No" << endl;
+//            cout << message.length() << endl;
+            return message.size() <= CLIENT_USERNAME_LEN - 2;
+        }
+        case Client_confirmation:
+        {
+            cout << "Code validation" << endl;
+            regex confirmation("^[0-9]{1,5}$");
+            return regex_match(message, confirmation);
+        }
+        case Client_ok: { return true; }
+        case Client_recharging:
+        {
+            if(message.length() < CLIENT_RECHARGING_LEN)
+                return true;
+            string recharging("RECHARGING");
+            return message == recharging;
+        }
+        case Client_full_power:
+        {
+            string full_power("FULL POWER");
+            return message == full_power;
+        }
+        case Client_message:
+        {
+            return message.length() <= CLIENT_MESSAGE_LEN - 2;
+        }
+        default: return true;
+    }
 }
 
-class CRobot : public CMessenger {
+
+class CClient : public CMessenger
+{
+private:
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
+    int m_sockfd;
+public:
+    CClient(int sockfd) : m_sockfd(sockfd)
+    {
+        timeval timer{TIMEOUT, 0};
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+    };
+    void authenticate();
+    unsigned short makeHash();
+    int putCodeIntoBuffer(const unsigned short code);
+    const queue<string> & getCommands() const { return m_commands; }
+};
+
+void CClient::authenticate()
+{
+    int messLen;
+
+    cout << "Waiting for username...\n";
+    //getting username
+    messLen = receiveMessage(m_sockfd, Client_username);
+
+    unsigned short hash = makeHash();
+    cout << "hash: " << hash << endl;
+    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
+    cout << "confirmation code: " << confirmationCode << endl;
+    int codeLen = putCodeIntoBuffer(confirmationCode);
+
+    //sending code to the client
+    sendMessage(m_sockfd, m_buffer, codeLen);
+
+    unsigned short expected = (hash + CLIENT_KEY) % 65536;
+    cout << "expecting code: " << expected << endl;
+
+    //getting client's code
+    messLen = receiveMessage(m_sockfd, Client_confirmation);
+
+    string response(m_commands.front());
+    m_commands.pop();
+
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
+    cout << "client confirmation code: " << clientConfirmationCode << endl;
+
+    if(expected != clientConfirmationCode) {
+        throw LoginError();
+    }
+}
+
+unsigned short CClient::makeHash()
+{
+    unsigned short hash = 0;
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
+    }
+    hash = (hash * 1000) % 65536;
+    return hash;
+}
+
+int CClient::putCodeIntoBuffer(const unsigned short code)
+{
+    string tmpStr = to_string(code);
+    tmpStr += POSTFIX;
+    for (int i = 0; i < tmpStr.length(); ++i) {
+        m_buffer[i] = tmpStr[i];
+    }
+
+    return (int)tmpStr.length();
+}
+
+class CRobot : public CMessenger
+{
 private:
     int m_sockfd;
     bool m_reached;
@@ -168,7 +291,7 @@ private:
                           m_prevPosition.first, m_prevPosition.second,
                           m_direction, m_reached); }
 public:
-    CRobot(int c_sockfd);
+    CRobot(int c_sockfd, const queue<string> & src);
 
 };
 
@@ -177,7 +300,7 @@ void CRobot::move()
     cout << "Robot moves\n";
     do {
         sendMessage(m_sockfd, SERVER_MOVE);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         extractCoords(m_commands.front());
         m_commands.pop();
     } while(m_position == m_prevPosition);
@@ -185,8 +308,9 @@ void CRobot::move()
     print();
 }
 
-CRobot::CRobot(int c_sockfd)
+CRobot::CRobot(int c_sockfd, const queue<string> & src)
         :m_sockfd(c_sockfd),
+         CMessenger(src),
          m_position(make_pair(INT32_MAX, INT32_MAX)),
          m_prevPosition(make_pair(0,0)),
          m_reached(false),
@@ -348,7 +472,7 @@ void CRobot::turnToProperDirection()
     {
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_LEFT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     } else {
         m_tmpDir = m_direction;
@@ -357,19 +481,19 @@ void CRobot::turnToProperDirection()
         {
             m_direction = m_tmpDir;
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
         }else {
             m_tmpDir = m_direction;
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
 
             turnRight();
             sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-            receiveMessage(m_sockfd, CLIENT_OK_LEN);
+            receiveMessage(m_sockfd, Client_ok);
             m_commands.pop();
 
             m_direction = m_tmpDir;
@@ -386,14 +510,14 @@ void CRobot::changeDirection()
     {
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_LEFT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     }else {
         m_tmpDir = m_direction;
         turnRight();
         m_direction = m_tmpDir;
         sendMessage(m_sockfd, SERVER_TURN_RIGHT);
-        receiveMessage(m_sockfd, CLIENT_OK_LEN);
+        receiveMessage(m_sockfd, Client_ok);
         m_commands.pop();
     }
 }
@@ -424,9 +548,6 @@ private:
     void setUpSocket();
     void run();
     void clientRoutine(int c_sockfd);
-    void authenticate(int c_sockfd);
-    unsigned short makeHash();
-    int putCodeIntoBuffer(unsigned short code);
 };
 
 void CServer::setUpSocket()
@@ -474,11 +595,10 @@ void CServer::run()
 
 void CServer::clientRoutine(int c_sockfd)
 {
-    timeval timer{TIMEOUT, 0};
-    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+    CClient client(c_sockfd);
 
     try {
-        authenticate(c_sockfd);
+        client.authenticate();
         sendMessage(c_sockfd, SERVER_OK);
     }
     catch (SyntaxError e) {
@@ -489,7 +609,6 @@ void CServer::clientRoutine(int c_sockfd)
     }
     catch(CommunicationError e) {
         cout << "Communication error\n";
-        sendMessage(c_sockfd, SERVER_LOGIN_FAILED);
         close(c_sockfd);
         return;
     }
@@ -500,10 +619,11 @@ void CServer::clientRoutine(int c_sockfd)
         return;
     }
 
+
     cout << "Authentication was successful\n";
 
     try {
-        CRobot robot(c_sockfd);
+        CRobot robot(c_sockfd, client.getCommands());
 
     }
     catch(CommunicationError e) {
@@ -515,64 +635,6 @@ void CServer::clientRoutine(int c_sockfd)
     cout << "The End" << endl;
 
     close(c_sockfd);
-}
-
-void CServer::authenticate(int c_sockfd)
-{
-    int messLen;
-
-    cout << "Waiting for username...\n";
-    //getting username
-    messLen = receiveMessage(c_sockfd, CLIENT_USERNAME_LEN);
-
-    unsigned short hash = makeHash();
-    cout << "hash: " << hash << endl;
-    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
-    cout << "confirmation code: " << confirmationCode << endl;
-    int codeLen = putCodeIntoBuffer(confirmationCode);
-
-    //sending code to the client
-    sendMessage(c_sockfd, m_buffer, codeLen);
-
-    unsigned short expected = (hash + CLIENT_KEY) % 65536;
-    cout << "expecting code: " << expected << endl;
-
-    //getting client's code
-    messLen = receiveMessage(c_sockfd, CLIENT_CONFIRMATION_LEN);
-
-    string response(m_commands.front());
-    m_commands.pop();
-
-    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
-    cout << "client confirmation code: " << clientConfirmationCode << endl;
-
-    if(expected != clientConfirmationCode) {
-        throw LoginError();
-    }
-}
-
-unsigned short CServer::makeHash()
-{
-    unsigned short hash = 0;
-    string username(m_commands.front());
-    m_commands.pop();
-    for(int i = 0; i < username.length(); i++) {
-        hash += username[i];
-    }
-    hash = (hash * 1000) % 65536;
-    return hash;
-}
-
-int CServer::putCodeIntoBuffer(unsigned short code)
-{
-
-    string tmpStr = to_string(code);
-    tmpStr += POSTFIX;
-    for (int i = 0; i < tmpStr.length(); ++i) {
-        m_buffer[i] = tmpStr[i];
-    }
-
-    return (int)tmpStr.length();
 }
 
 
