@@ -82,7 +82,12 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
 int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
     if(!m_commands.empty())
-        return (int)m_commands.front().length();
+    {
+        if(isValid(m_commands.front(), type))
+            return (int)m_commands.front().length();
+        else
+            throw SyntaxError();
+    }
 
     int mlen = 0;
     string tmpContainer;
