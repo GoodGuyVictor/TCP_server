@@ -127,8 +127,9 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 
             cout << "not found" << endl;
 
-            if(!isValid(tmpContainer, type, c_sockfd))
-                throw SyntaxError();
+            if(type != Client_ok)
+                if(!isValid(tmpContainer, type, c_sockfd))
+                    throw SyntaxError();
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
@@ -167,7 +168,11 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
             if(message == "RECHARGING")
                 message = rechargingHandler(c_sockfd, Client_ok);
 
-            return true;
+            if(message.length() > CLIENT_OK_LEN - 2)
+                return false;
+
+            regex ok("^OK -?[0-9]+ -?[0-9]+$");
+            return regex_match(message, ok);
         }
         case Client_full_power:
         {
