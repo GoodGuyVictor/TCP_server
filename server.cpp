@@ -39,6 +39,7 @@ using namespace std;
 class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
+class LogicError{};
 
 enum EDirection { Default, Up, Right, Down, Left };
 enum EMessageType
@@ -58,13 +59,16 @@ public:
     CMessenger() = default;
     CMessenger(const queue<string> & src) : m_commands(src) {}
 protected:
+    const unsigned short CLIENT_KEY = 45328;
+    const unsigned short SERVER_KEY = 54621;
     char m_buffer[1000];
     const size_t BUFFSIZE = 1000;
     queue<string> m_commands;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, EMessageType type);
-    bool isValid(const string &message, EMessageType type) const;
+    bool isValid(string &message, EMessageType type, int c_sockfd);
+    string rechargingHandler(const int c_sockfd, EMessageType type);
 };
 
 
@@ -83,7 +87,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
     if(!m_commands.empty())
     {
-        if(isValid(m_commands.front(), type))
+        if(isValid(m_commands.front(), type, c_sockfd))
             return (int)m_commands.front().length();
         else
             throw SyntaxError();
@@ -92,7 +96,6 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
-    bool foundBool = false;
 
     if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
     {
@@ -103,15 +106,14 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
-        cout << "buffer: "<< tmpContainer << endl;
+        cout << "buffer: " << tmpContainer << endl;
 
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
-            foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
 
-            if(!isValid(tmpCommand, type))
+            if(!isValid(tmpCommand, type, c_sockfd))
                 throw SyntaxError();
             else
                 type = Client_default;
@@ -124,16 +126,9 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
         } else {
 
             cout << "not found" << endl;
-//            if (!foundBool && tmpContainer.size() > expectedLen){
-//                throw SyntaxError();
-//            }
-            if(!isValid(tmpContainer, type))
-                throw SyntaxError();
 
-//            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-//                perror("write error");
-//                throw CommunicationError();
-//            }
+            if(!isValid(tmpContainer, type, c_sockfd))
+                throw SyntaxError();
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
@@ -150,120 +145,71 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     return (int)m_commands.front().length();
 }
 
-bool CMessenger::isValid(const string &message, EMessageType type) const
+bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
 {
     switch(type)
     {
         case Client_username:
         {
-//            if(message.length() <= 10)
-//                cout << "Name len is less than or equal to 10" << endl;
-//            else cout << "No" << endl;
-//            cout << message.length() << endl;
             return message.size() <= CLIENT_USERNAME_LEN - 2;
         }
         case Client_confirmation:
         {
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_confirmation);
+
             cout << "Code validation" << endl;
             regex confirmation("^[0-9]{1,5}$");
             return regex_match(message, confirmation);
         }
-        case Client_ok: { return true; }
-        case Client_recharging:
+        case Client_ok:
         {
-            if(message.length() < CLIENT_RECHARGING_LEN)
-                return true;
-            string recharging("RECHARGING");
-            return message == recharging;
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_ok);
+
+            return true;
         }
         case Client_full_power:
         {
-            string full_power("FULL POWER");
-            return message == full_power;
+            if(message != "FULL POWER") {
+                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
+                    return true;
+
+                if(message.length() == CLIENT_FULL_POWER_LEN - 2)
+                    throw LogicError();
+
+                if(message.length() > CLIENT_FULL_POWER_LEN - 2)
+                    throw SyntaxError();
+            }
+            return true;
         }
         case Client_message:
         {
+            if(message == "RECHARGING")
+                message = rechargingHandler(c_sockfd, Client_message);
+
             return message.length() <= CLIENT_MESSAGE_LEN - 2;
         }
         default: return true;
     }
 }
 
-
-class CClient : public CMessenger
+string CMessenger::rechargingHandler(const int c_sockfd, EMessageType type)
 {
-private:
-    const unsigned short CLIENT_KEY = 45328;
-    const unsigned short SERVER_KEY = 54621;
-    int m_sockfd;
-public:
-    CClient(int sockfd) : m_sockfd(sockfd)
-    {
-        timeval timer{TIMEOUT, 0};
-        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
-    };
-    void authenticate();
-    unsigned short makeHash();
-    int putCodeIntoBuffer(const unsigned short code);
-    const queue<string> & getCommands() const { return m_commands; }
-};
+    timeval timer{TIMEOUT_RECHARGING, 0};
+    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
 
-void CClient::authenticate()
-{
-    int messLen;
+    receiveMessage(c_sockfd, Client_full_power);
+    //fetch FULL POWER message
+    m_commands.pop();
+    receiveMessage(c_sockfd, type);
 
-    cout << "Waiting for username...\n";
-    //getting username
-    messLen = receiveMessage(m_sockfd, Client_username);
-
-    unsigned short hash = makeHash();
-    cout << "hash: " << hash << endl;
-    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
-    cout << "confirmation code: " << confirmationCode << endl;
-    int codeLen = putCodeIntoBuffer(confirmationCode);
-
-    //sending code to the client
-    sendMessage(m_sockfd, m_buffer, codeLen);
-
-    unsigned short expected = (hash + CLIENT_KEY) % 65536;
-    cout << "expecting code: " << expected << endl;
-
-    //getting client's code
-    messLen = receiveMessage(m_sockfd, Client_confirmation);
-
-    string response(m_commands.front());
+    string nextMessage(m_commands.front()); //segfault possibility
     m_commands.pop();
 
-    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
-    cout << "client confirmation code: " << clientConfirmationCode << endl;
-
-    if(expected != clientConfirmationCode) {
-        throw LoginError();
-    }
+    return nextMessage;
 }
 
-unsigned short CClient::makeHash()
-{
-    unsigned short hash = 0;
-    string username(m_commands.front());
-    m_commands.pop();
-    for(int i = 0; i < username.length(); i++) {
-        hash += username[i];
-    }
-    hash = (hash * 1000) % 65536;
-    return hash;
-}
-
-int CClient::putCodeIntoBuffer(const unsigned short code)
-{
-    string tmpStr = to_string(code);
-    tmpStr += POSTFIX;
-    for (int i = 0; i < tmpStr.length(); ++i) {
-        m_buffer[i] = tmpStr[i];
-    }
-
-    return (int)tmpStr.length();
-}
 
 class CRobot : public CMessenger
 {
@@ -286,14 +232,79 @@ private:
     void turnRight();
     void turnToProperDirection();
     void changeDirection();
+    void authenticate();
+    unsigned short makeHash();
+    int putCodeIntoBuffer(const unsigned short);
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\ndir: %d\nreached: %d\n",
                           m_position.first, m_position.second,
                           m_prevPosition.first, m_prevPosition.second,
                           m_direction, m_reached); }
 public:
-    CRobot(int c_sockfd, const queue<string> & src);
+    CRobot(int c_sockfd);
 
 };
+
+CRobot::CRobot(int c_sockfd)
+        :m_sockfd(c_sockfd),
+         m_position(make_pair(INT32_MAX, INT32_MAX)),
+         m_prevPosition(make_pair(0,0)),
+         m_reached(false),
+         m_direction(Default),
+         m_requiredDirHor(Default),
+         m_requiredDirVert(Default),
+         m_tmpDir(Default)
+{
+    timeval timer{TIMEOUT, 0};
+    setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
+
+    authenticate();
+    sendMessage(c_sockfd, SERVER_OK);
+
+    cout << "Authentication succeed" << endl;
+
+    move();
+    move();
+    if(m_reached)
+        return;
+    determineMyDirection();
+    determineRequiredDirection();
+    turnToProperDirection();
+    print();
+
+//    switch(m_direction){
+//        case Up: {
+//            while(m_position.second < -2)
+//                move();
+//            break;
+//        }
+//        case Down: {
+//            while(m_position.second > 2)
+//                move();
+//            break;
+//        }
+//        case Right: {
+//            while(m_position.first < -2)
+//                move();
+//            break;
+//        }
+//        case Left: {
+//            while(m_position.first > 2)
+//                move();
+//            break;
+//        }
+//    } cout << "End of switch" << endl;
+//
+//
+//    if(!m_reached) {
+//        changeDirection();
+//
+//        while(!m_reached)
+//            move();
+//    }
+//
+//    print();
+//    cout << "Reached bro!" << endl;
+}
 
 void CRobot::move()
 {
@@ -306,61 +317,6 @@ void CRobot::move()
     } while(m_position == m_prevPosition);
     checkIfReached();
     print();
-}
-
-CRobot::CRobot(int c_sockfd, const queue<string> & src)
-        :m_sockfd(c_sockfd),
-         CMessenger(src),
-         m_position(make_pair(INT32_MAX, INT32_MAX)),
-         m_prevPosition(make_pair(0,0)),
-         m_reached(false),
-         m_direction(Default),
-         m_requiredDirHor(Default),
-         m_requiredDirVert(Default),
-         m_tmpDir(Default)
-{
-    move();
-    move();
-    if(m_reached)
-        return;
-    determineMyDirection();
-    determineRequiredDirection();
-    turnToProperDirection();
-    print();
-
-    switch(m_direction){
-        case Up: {
-            while(m_position.second < -2)
-                move();
-            break;
-        }
-        case Down: {
-            while(m_position.second > 2)
-                move();
-            break;
-        }
-        case Right: {
-            while(m_position.first < -2)
-                move();
-            break;
-        }
-        case Left: {
-            while(m_position.first > 2)
-                move();
-            break;
-        }
-    } cout << "End of switch" << endl;
-
-
-    if(!m_reached) {
-        changeDirection();
-
-        while(!m_reached)
-            move();
-    }
-
-    print();
-    cout << "Reached bro!" << endl;
 }
 
 void CRobot::extractCoords(const string & str)
@@ -522,6 +478,63 @@ void CRobot::changeDirection()
     }
 }
 
+void CRobot::authenticate()
+{
+    int messLen;
+
+    cout << "Waiting for username...\n";
+    //getting username
+    messLen = receiveMessage(m_sockfd, Client_username);
+
+    unsigned short hash = makeHash();
+    cout << "hash: " << hash << endl;
+    unsigned short confirmationCode = (hash + SERVER_KEY) % 65536;
+    cout << "confirmation code: " << confirmationCode << endl;
+    int codeLen = putCodeIntoBuffer(confirmationCode);
+
+    //sending code to the client
+    sendMessage(m_sockfd, m_buffer, codeLen);
+
+    unsigned short expected = (hash + CLIENT_KEY) % 65536;
+    cout << "expecting code: " << expected << endl;
+
+    //getting client's code
+    messLen = receiveMessage(m_sockfd, Client_confirmation);
+
+    string response(m_commands.front());
+    m_commands.pop();
+
+    unsigned short clientConfirmationCode = (unsigned short)stoi(response);
+    cout << "client confirmation code: " << clientConfirmationCode << endl;
+
+    if(expected != clientConfirmationCode) {
+        throw LoginError();
+    }
+}
+
+unsigned short CRobot::makeHash()
+{
+    unsigned short hash = 0;
+    string username(m_commands.front());
+    m_commands.pop();
+    for(int i = 0; i < username.length(); i++) {
+        hash += username[i];
+    }
+    hash = (hash * 1000) % 65536;
+    return hash;
+}
+
+int CRobot::putCodeIntoBuffer(const unsigned short code)
+{
+    string tmpStr = to_string(code);
+    tmpStr += POSTFIX;
+    for (int i = 0; i < tmpStr.length(); ++i) {
+        m_buffer[i] = tmpStr[i];
+    }
+
+    return (int)tmpStr.length();
+}
+
 
 class CServer : public CMessenger
 {
@@ -595,11 +608,9 @@ void CServer::run()
 
 void CServer::clientRoutine(int c_sockfd)
 {
-    CClient client(c_sockfd);
 
     try {
-        client.authenticate();
-        sendMessage(c_sockfd, SERVER_OK);
+        CRobot robot(c_sockfd);
     }
     catch (SyntaxError e) {
         cout << "Syntax error\n";
@@ -622,15 +633,7 @@ void CServer::clientRoutine(int c_sockfd)
 
     cout << "Authentication was successful\n";
 
-    try {
-        CRobot robot(c_sockfd, client.getCommands());
 
-    }
-    catch(CommunicationError e) {
-        cout << "Communication error\n";
-        close(c_sockfd);
-        return;
-    }
 
     cout << "The End" << endl;
 
