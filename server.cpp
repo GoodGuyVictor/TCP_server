@@ -92,7 +92,6 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
-    bool foundBool = false;
 
     if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
     {
@@ -103,12 +102,11 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
-        cout << "buffer: "<< tmpContainer << endl;
+        cout << "buffer: " << tmpContainer << endl;
 
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
-            foundBool = true;
             string tmpCommand(tmpContainer, 0, foundPos);
 
             if(!isValid(tmpCommand, type))
@@ -124,24 +122,14 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
         } else {
 
             cout << "not found" << endl;
-//            if (!foundBool && tmpContainer.size() > expectedLen){
-//                throw SyntaxError();
-//            }
+
             if(!isValid(tmpContainer, type))
                 throw SyntaxError();
-
-//            if (send(c_sockfd, m_buffer, mlen, 0) == -1) {
-//                perror("write error");
-//                throw CommunicationError();
-//            }
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
                 perror("read error");
                 throw CommunicationError();
             }
-
-            if (mlen == 0)
-                throw CommunicationError();
 
             tmpContainer.append(m_buffer, mlen);
         }
