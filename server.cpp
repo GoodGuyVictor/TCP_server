@@ -40,6 +40,7 @@ class CommunicationError{};
 class SyntaxError{};
 class LoginError{};
 class LogicError{};
+class LogOut{};
 
 enum EDirection { Default, Up, Right, Down, Left };
 enum EMessageType
@@ -228,17 +229,23 @@ private:
     EDirection m_direction;
     EDirection m_tmpDir;
 
-    void move();
+private:
     void extractCoords(const string & str);
     void determineMyDirection();
     void determineRequiredDirection();
     void checkIfReached();
     void turnLeft();
     void turnRight();
+    void turn(const int bound);
     void turnToProperDirection();
-    void changeDirection();
     void authenticate();
     unsigned short makeHash();
+    void searchOutterRing();
+    pair<int, int> nextStep();
+    bool outOfRing(pair<int, int> pos, const int bound);
+    void pickupMessage();
+    void moveInwards();
+    void searchInnerRing();
     int putCodeIntoBuffer(const unsigned short);
     void print() { printf("curX: %d\ncurY: %d\nprevX: %d\nprevY: %d\ndir: %d\nreached: %d\n",
                           m_position.first, m_position.second,
@@ -246,6 +253,12 @@ private:
                           m_direction, m_reached); }
 public:
     CRobot(int c_sockfd);
+    void move();
+    void changeDirection();
+    bool reached() const;
+    const pair<int, int> &getPosition() const;
+    EDirection getDirection() const;
+    void findMessage();
 
 };
 
@@ -264,51 +277,14 @@ CRobot::CRobot(int c_sockfd)
 
     authenticate();
     sendMessage(c_sockfd, SERVER_OK);
-
     cout << "Authentication succeed" << endl;
 
     move();
     move();
-    if(m_reached)
-        return;
     determineMyDirection();
     determineRequiredDirection();
     turnToProperDirection();
     print();
-
-//    switch(m_direction){
-//        case Up: {
-//            while(m_position.second < -2)
-//                move();
-//            break;
-//        }
-//        case Down: {
-//            while(m_position.second > 2)
-//                move();
-//            break;
-//        }
-//        case Right: {
-//            while(m_position.first < -2)
-//                move();
-//            break;
-//        }
-//        case Left: {
-//            while(m_position.first > 2)
-//                move();
-//            break;
-//        }
-//    } cout << "End of switch" << endl;
-//
-//
-//    if(!m_reached) {
-//        changeDirection();
-//
-//        while(!m_reached)
-//            move();
-//    }
-//
-//    print();
-//    cout << "Reached bro!" << endl;
 }
 
 void CRobot::move()
@@ -540,6 +516,187 @@ int CRobot::putCodeIntoBuffer(const unsigned short code)
     return (int)tmpStr.length();
 }
 
+bool CRobot::reached() const
+{
+    return m_reached;
+}
+
+const pair<int, int> &CRobot::getPosition() const
+{
+    return m_position;
+}
+
+EDirection CRobot::getDirection() const
+{
+    return m_direction;
+}
+
+void CRobot::findMessage()
+{
+    //if currently at the outter ring
+    if(abs(m_position.first) == 2 || abs(m_position.second) == 2)
+    {
+        searchOutterRing();
+        moveInwards();
+        searchInnerRing();
+        moveInwards();
+        pickupMessage();
+    } else cout << "Inside bro" << endl;
+//    if(abs(m_position.first) == 0 && abs(m_position.second) == 0) {
+
+//    }
+}
+
+void CRobot::searchOutterRing()
+{
+    pickupMessage();
+    auto initialPosition = m_position;
+    m_tmpDir = m_direction;
+
+    //if at the corner
+    if(abs(m_position.first) == 2 && abs(m_position.second) == 2)
+    {
+        cout << "Outter ring corner" << endl;
+        move();
+        while(m_position != initialPosition) {
+            pickupMessage();
+            if(outOfRing(nextStep(), 2))
+                turn(2);
+            if(nextStep() == initialPosition)
+                break;
+            move();
+        }
+    } else {
+        cout << "Outter ring not corner" << endl;
+        m_tmpDir = m_direction;
+        turnRight();
+        sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+        receiveMessage(m_sockfd, Client_ok);
+        m_commands.pop();
+        m_direction = m_tmpDir;
+        move();
+
+        while(m_position != initialPosition) {
+            pickupMessage();
+            if(outOfRing(nextStep(), 2))
+                turn(2);
+            if(nextStep() == initialPosition)
+                break;
+            move();
+        }
+    }
+}
+
+pair<int, int> CRobot::nextStep()
+{
+//    m_tmpDir = m_direction;
+    switch(m_tmpDir){
+        case Up: return make_pair(m_position.first, m_position.second + 1);
+        case Down: return make_pair(m_position.first, m_position.second - 1);
+        case Right: return make_pair(m_position.first + 1, m_position.second);
+        case Left: return make_pair(m_position.first - 1, m_position.second);
+    }
+}
+
+bool CRobot::outOfRing(pair<int, int> pos, const int bound)
+{
+    return abs(pos.first) > bound || abs(pos.second) > bound;
+}
+
+void CRobot::pickupMessage()
+{
+    sendMessage(m_sockfd, SERVER_PICK_UP);
+    receiveMessage(m_sockfd, Client_message);
+
+    //potential mistaker
+    if(m_commands.front() != "")
+        throw LogOut();
+    else
+        m_commands.pop();
+}
+
+void CRobot::turn(const int bound)
+{
+    m_tmpDir = m_direction;
+    turnRight();
+    if(!outOfRing( nextStep(), bound))
+    {
+        sendMessage(m_sockfd, SERVER_TURN_RIGHT);
+        receiveMessage(m_sockfd, Client_ok);
+        m_commands.pop();
+        m_direction = m_tmpDir;
+    } else {
+        m_tmpDir = m_direction;
+        turnLeft();
+        sendMessage(m_sockfd, SERVER_TURN_LEFT);
+        receiveMessage(m_sockfd, Client_ok);
+        m_commands.pop();
+        m_direction = m_tmpDir;
+    }
+}
+
+void CRobot::moveInwards()
+{
+    //if at outter ring
+    if(abs(m_position.first) == 2 || abs(m_position.second) == 2) {
+        //if at the corner
+        if(abs(m_position.first) == 2 && abs(m_position.second) == 2) {
+            move();
+            turn(1);
+            move();
+        } else {
+            turn(1);
+            move();
+        }
+    } else {
+        turn(0);
+        move();
+    }
+}
+
+void CRobot::searchInnerRing()
+{
+    pickupMessage();
+    auto initialPosition =  m_position;
+    m_tmpDir = m_direction;
+
+    //if at the corner
+    if(abs(m_position.first) == 1 && abs(m_position.second) == 1)
+    {
+        if(!outOfRing( nextStep(), 1) )
+            move();
+        else {
+            //potential mistake
+            turn(1);
+            move();
+        }
+
+        while(m_position != initialPosition) {
+            pickupMessage();
+            if(outOfRing(nextStep(), 1))
+                turn(1);
+            if(nextStep() == initialPosition)
+                break;
+            move();
+        }
+    } else {
+        if(outOfRing( nextStep(), 1 )) {
+            turn(1);
+            move();
+        } else
+            move();
+
+        while(m_position != initialPosition) {
+            pickupMessage();
+            if(outOfRing(nextStep(), 1))
+                turn(1);
+            if(nextStep() == initialPosition)
+                break;
+            move();
+        }
+    }
+}
+
 
 class CServer : public CMessenger
 {
@@ -616,6 +773,39 @@ void CServer::clientRoutine(int c_sockfd)
 
     try {
         CRobot robot(c_sockfd);
+
+        switch(robot.getDirection()){
+            case Up: {
+                while(robot.getPosition().second < -2)
+                    robot.move();
+                break;
+            }
+            case Down: {
+                while(robot.getPosition().second > 2)
+                    robot.move();
+                break;
+            }
+            case Right: {
+                while(robot.getPosition().first < -2)
+                    robot.move();
+                break;
+            }
+            case Left: {
+                while(robot.getPosition().first > 2)
+                    robot.move();
+                break;
+            }
+        } cout << "End of switch" << endl;
+
+
+        if(!robot.reached()) {
+            robot.changeDirection();
+
+            while(!robot.reached())
+                robot.move();
+        }
+
+        robot.findMessage();
     }
     catch (SyntaxError e) {
         cout << "Syntax error\n";
@@ -631,6 +821,12 @@ void CServer::clientRoutine(int c_sockfd)
     catch(LoginError e) {
         cout << "Login error\n";
         sendMessage(c_sockfd, SERVER_LOGIN_FAILED);
+        close(c_sockfd);
+        return;
+    }
+    catch(LogOut e) {
+        cout << "Message found\n";
+        sendMessage(c_sockfd, SERVER_LOGOUT);
         close(c_sockfd);
         return;
     }
