@@ -87,28 +87,29 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
 
 int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
-    if(!m_commands.empty())
-    {
-        if(isValid(m_commands.front(), type, c_sockfd))
-            return (int)m_commands.front().length();
-        else
-            throw SyntaxError();
-    }
+//    if(!m_commands.empty())
+//    {
+//        if(isValid(m_commands.front(), type, c_sockfd))
+//            return (int)m_commands.front().length();
+//        else
+//            throw SyntaxError();
+//    }
 
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
 
-    if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
-    {
-        perror("read error");
-        throw CommunicationError();
-    }
-
     if(!m_storage.empty()) {
         tmpContainer.append(m_storage);
         m_storage = "";
+    } else {
+        if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+        {
+            perror("read error");
+            throw CommunicationError();
+        }
     }
+
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
@@ -133,7 +134,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 
             cout << "not found" << endl;
 
-            if(type != Client_ok)
+//            if(type != Client_ok)
                 if(!isValid(tmpContainer, type, c_sockfd))
                     throw SyntaxError();
 
@@ -169,6 +170,9 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
                 message = rechargingHandler(c_sockfd, Client_confirmation);
             }
 
+            if(message.length() > CLIENT_OK_LEN - 2)
+                return false;
+
             cout << "Code validation" << endl;
             regex confirmation("^[0-9]{1,5}$");
             if(regex_match(message, confirmation))
@@ -189,10 +193,14 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
                 message = rechargingHandler(c_sockfd, Client_ok);
             }
 
-            if(message.length() > CLIENT_OK_LEN - 2)
-                return false;
+            string recharging("RECHARGING\a");
+            if(recharging.find(message) != string::npos)
+                return true;
 
-            regex ok("^OK -?[0-9]+ -?[0-9]+$");
+//            if(message.length() > CLIENT_OK_LEN - 2)
+//                return false;
+
+            regex ok("^O?K? ?-?[0-9]* ?-?[0-9]*(\a)?$");
             return regex_match(message, ok);
         }
         case Client_full_power:
