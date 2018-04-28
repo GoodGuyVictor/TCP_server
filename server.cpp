@@ -178,14 +178,15 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
         case Client_full_power:
         {
             if(message != "FULL POWER") {
-                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
-                    return true;
-
-                if(message.length() == CLIENT_FULL_POWER_LEN - 2)
-                    throw LogicError();
-
-                if(message.length() > CLIENT_FULL_POWER_LEN - 2)
-                    throw SyntaxError();
+                throw LogicError();
+//                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
+//                    return true;
+//
+//                if(message.length() == CLIENT_FULL_POWER_LEN - 2)
+//                    throw LogicError();
+//
+//                if(message.length() > CLIENT_FULL_POWER_LEN - 2)
+//                    throw SyntaxError();
             }
             return true;
         }
@@ -827,6 +828,12 @@ void CServer::clientRoutine(int c_sockfd)
     catch(LogOut e) {
         cout << "Message found\n";
         sendMessage(c_sockfd, SERVER_LOGOUT);
+        close(c_sockfd);
+        return;
+    }
+    catch(LogicError e) {
+        cout << "Logic error\n";
+        sendMessage(c_sockfd, SERVER_LOGIC_ERROR);
         close(c_sockfd);
         return;
     }
