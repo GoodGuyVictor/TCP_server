@@ -49,7 +49,6 @@ enum EMessageType
     Client_username,
     Client_confirmation,
     Client_ok,
-    Client_recharging,
     Client_full_power,
     Client_message
 };
