@@ -65,10 +65,11 @@ protected:
     char m_buffer[1000];
     const size_t BUFFSIZE = 1000;
     queue<string> m_commands;
+    string m_storage;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, EMessageType type);
-    bool isValid(string &message, EMessageType type, int c_sockfd);
+    bool isValid(string &message, EMessageType type, int c_sockfd, bool found);
     string rechargingHandler(const int c_sockfd, EMessageType type);
 };
 
@@ -86,22 +87,31 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
 
 int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
-    if(!m_commands.empty())
-    {
-        if(isValid(m_commands.front(), type, c_sockfd))
-            return (int)m_commands.front().length();
-        else
-            throw SyntaxError();
-    }
+//    if(!m_commands.empty())
+//    {
+//        if(isValid(m_commands.front(), type, c_sockfd))
+//            return (int)m_commands.front().length();
+//        else
+//            throw SyntaxError();
+//    }
 
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
+    bool foundBool = false;
 
-    if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
-    {
-        perror("read error");
-        throw CommunicationError();
+    if(!m_storage.empty()) {
+        cout << "Storage is not empty, appending (" << m_storage << ')' << endl;
+        tmpContainer.append(m_storage);
+        m_storage = "";
+    } else {
+        cout << "Reading message" << endl;
+        if ((mlen = (int)recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1)
+        {
+            perror("read error");
+            throw CommunicationError();
+        }
+        cout << mlen << " bytes were read" << endl;
     }
 
     tmpContainer.append(m_buffer, mlen);
@@ -109,12 +119,16 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     while(true) {
         cout << "buffer: " << tmpContainer << endl;
 
+
+
         foundPos = tmpContainer.find(POSTFIX);
 
         if (foundPos != string::npos) {
+            foundBool = true;
+            cout << "Found" << endl;
             string tmpCommand(tmpContainer, 0, foundPos);
 
-            if(!isValid(tmpCommand, type, c_sockfd))
+            if(!isValid(tmpCommand, type, c_sockfd, foundBool))
                 throw SyntaxError();
             else
                 type = Client_default;
@@ -122,14 +136,14 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
-                continue;
+                m_storage.append(tmpContainer);
             break;
         } else {
 
             cout << "not found" << endl;
 
-            if(type != Client_ok)
-                if(!isValid(tmpContainer, type, c_sockfd))
+//            if(type != Client_ok)
+                if(!isValid(tmpContainer, type, c_sockfd, foundBool))
                     throw SyntaxError();
 
             if ((mlen = recv(c_sockfd, m_buffer, BUFFSIZE, 0)) == -1) {
@@ -147,7 +161,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
     return (int)m_commands.front().length();
 }
 
-bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
+bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd, bool found)
 {
     switch(type)
     {
@@ -164,6 +178,9 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
                 message = rechargingHandler(c_sockfd, Client_confirmation);
             }
 
+            if(message.length() > CLIENT_OK_LEN - 2)
+                return false;
+
             cout << "Code validation" << endl;
             regex confirmation("^[0-9]{1,5}$");
             if(regex_match(message, confirmation))
@@ -177,17 +194,21 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
         case Client_ok:
         {
             cout << "OK validation" << endl;
-            if(message == "RECHARGING") {
-                if(m_commands.front() == "RECHARGING")
-                    m_commands.pop();
+            if(message == "RECHARGING" && found) {
+//                if(m_commands.front() == "RECHARGING")
+//                    m_commands.pop();
 
                 message = rechargingHandler(c_sockfd, Client_ok);
             }
 
-            if(message.length() > CLIENT_OK_LEN - 2)
-                return false;
+            string recharging("RECHARGING\a");
+            if(recharging.find(message) != string::npos)
+                return true;
 
-            regex ok("^OK -?[0-9]+ -?[0-9]+$");
+//            if(message.length() > CLIENT_OK_LEN - 2)
+//                return false;
+
+            regex ok("^O?K? ?-?[0-9]* ?-?[0-9]*(\a)?$");
             return regex_match(message, ok);
         }
         case Client_full_power:
@@ -228,6 +249,7 @@ string CMessenger::rechargingHandler(const int c_sockfd, EMessageType type)
     timeval timer{TIMEOUT_RECHARGING, 0};
     setsockopt(c_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timer, sizeof(struct timeval));
 
+    cout << "Recharging handler" << endl;
     receiveMessage(c_sockfd, Client_full_power);
     //fetch FULL POWER message
     m_commands.pop();
