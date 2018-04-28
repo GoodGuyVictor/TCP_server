@@ -65,6 +65,7 @@ protected:
     char m_buffer[1000];
     const size_t BUFFSIZE = 1000;
     queue<string> m_commands;
+    string m_storage;
 
     void sendMessage(int c_sockfd, const char *message, int mlen) const;
     int receiveMessage(int c_sockfd, EMessageType type);
@@ -104,6 +105,10 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
         throw CommunicationError();
     }
 
+    if(!m_storage.empty()) {
+        tmpContainer.append(m_storage);
+        m_storage = "";
+    }
     tmpContainer.append(m_buffer, mlen);
 
     while(true) {
@@ -122,7 +127,7 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
             m_commands.push(tmpCommand);
             tmpContainer.erase(0, foundPos + 2);
             if (!tmpContainer.empty())
-                continue;
+                m_storage.append(tmpContainer);
             break;
         } else {
 
