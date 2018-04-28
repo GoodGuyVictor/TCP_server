@@ -157,17 +157,32 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
         }
         case Client_confirmation:
         {
-            if(message == "RECHARGING")
+            if(message == "RECHARGING") {
+                if(m_commands.front() == "RECHARGING")
+                    m_commands.pop();
+
                 message = rechargingHandler(c_sockfd, Client_confirmation);
+            }
 
             cout << "Code validation" << endl;
             regex confirmation("^[0-9]{1,5}$");
-            return regex_match(message, confirmation);
+            if(regex_match(message, confirmation))
+                return true;
+            else {
+                if(message.find("\a") != string::npos)
+                    return true;
+                return false;
+            }
         }
         case Client_ok:
         {
-            if(message == "RECHARGING")
+            cout << "OK validation" << endl;
+            if(message == "RECHARGING") {
+                if(m_commands.front() == "RECHARGING")
+                    m_commands.pop();
+
                 message = rechargingHandler(c_sockfd, Client_ok);
+            }
 
             if(message.length() > CLIENT_OK_LEN - 2)
                 return false;
@@ -177,8 +192,11 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
         }
         case Client_full_power:
         {
+            cout << "Full power validation" << endl;
             if(message != "FULL POWER") {
-                throw LogicError();
+                string full("FULL POWER\a");
+                if(full.find(message) == string::npos)
+                    throw LogicError();
 //                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
 //                    return true;
 //
@@ -192,8 +210,12 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd)
         }
         case Client_message:
         {
-            if(message == "RECHARGING")
+            if(message == "RECHARGING") {
+                if(m_commands.front() == "RECHARGING")
+                    m_commands.pop();
+
                 message = rechargingHandler(c_sockfd, Client_message);
+            }
 
             return message.length() <= CLIENT_MESSAGE_LEN - 2;
         }
