@@ -87,14 +87,6 @@ void CMessenger::sendMessage(int c_sockfd, const char *message, int mlen = 0) co
 
 int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 {
-//    if(!m_commands.empty())
-//    {
-//        if(isValid(m_commands.front(), type, c_sockfd))
-//            return (int)m_commands.front().length();
-//        else
-//            throw SyntaxError();
-//    }
-
     int mlen = 0;
     string tmpContainer;
     size_t foundPos;
@@ -142,7 +134,6 @@ int CMessenger::receiveMessage(int c_sockfd, EMessageType type)
 
             cout << "not found" << endl;
 
-//            if(type != Client_ok)
                 if(!isValid(tmpContainer, type, c_sockfd, foundBool))
                     throw SyntaxError();
 
@@ -194,19 +185,12 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd, bool 
         case Client_ok:
         {
             cout << "OK validation" << endl;
-            if(message == "RECHARGING" && found) {
-//                if(m_commands.front() == "RECHARGING")
-//                    m_commands.pop();
-
+            if(message == "RECHARGING" && found)
                 message = rechargingHandler(c_sockfd, Client_ok);
-            }
 
             string recharging("RECHARGING\a");
             if(recharging.find(message) != string::npos)
                 return true;
-
-//            if(message.length() > CLIENT_OK_LEN - 2)
-//                return false;
 
             regex ok("^O?K? ?-?[0-9]* ?-?[0-9]*(\a)?$");
             return regex_match(message, ok);
@@ -218,14 +202,6 @@ bool CMessenger::isValid(string &message, EMessageType type, int c_sockfd, bool 
                 string full("FULL POWER\a");
                 if(full.find(message) == string::npos)
                     throw LogicError();
-//                if(message.length() < CLIENT_FULL_POWER_LEN - 2)
-//                    return true;
-//
-//                if(message.length() == CLIENT_FULL_POWER_LEN - 2)
-//                    throw LogicError();
-//
-//                if(message.length() > CLIENT_FULL_POWER_LEN - 2)
-//                    throw SyntaxError();
             }
             return true;
         }
@@ -255,7 +231,7 @@ string CMessenger::rechargingHandler(const int c_sockfd, EMessageType type)
     m_commands.pop();
     receiveMessage(c_sockfd, type);
 
-    string nextMessage(m_commands.front()); //segfault possibility
+    string nextMessage(m_commands.front());
     m_commands.pop();
 
     return nextMessage;
@@ -415,7 +391,6 @@ void CRobot::turnLeft()
 {
     cout << "tmpDir before: " << m_tmpDir << endl;
 
-//    m_tmpDir = m_direction;
     switch(m_tmpDir) {
         case Up: { m_tmpDir = Left; break; }
         case Down: { m_tmpDir = Right; break; }
@@ -430,7 +405,6 @@ void CRobot::turnRight()
 {
     cout << "tmpDir before: " << m_tmpDir << endl;
 
-//    m_tmpDir = m_direction;
     switch(m_tmpDir) {
         case Up: { m_tmpDir = Right; break; }
         case Down: { m_tmpDir = Left; break; }
@@ -587,9 +561,7 @@ void CRobot::findMessage()
         moveInwards();
         pickupMessage();
     } else cout << "Inside bro" << endl;
-//    if(abs(m_position.first) == 0 && abs(m_position.second) == 0) {
 
-//    }
 }
 
 void CRobot::searchOutterRing()
@@ -634,7 +606,6 @@ void CRobot::searchOutterRing()
 
 pair<int, int> CRobot::nextStep()
 {
-//    m_tmpDir = m_direction;
     switch(m_tmpDir){
         case Up: return make_pair(m_position.first, m_position.second + 1);
         case Down: return make_pair(m_position.first, m_position.second - 1);
@@ -754,15 +725,12 @@ public:
     }
 
 private:
-    // const int ECHOPORT = 5599;
     int ECHOPORT;
     const unsigned short CLIENT_KEY = 45328;
     const unsigned short SERVER_KEY = 54621;
     int m_my_sockfd;
     sockaddr_in m_my_addr;
     sockaddr_in m_rem_addr;
-
-
 
 
     void setUpSocket();
